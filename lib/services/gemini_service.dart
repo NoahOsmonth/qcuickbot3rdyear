@@ -22,7 +22,7 @@ class GeminiService {
           )).toList();
       // Append new user message
       messages.add(Content(parts: [Part.text(message)], role: 'user'));
-      final response = await _gemini.chat(messages, modelName: 'gemini-2.0-flash');
+      final response = await _gemini.chat(messages, modelName: 'gemini-2.5-flash-preview-04-17');
 
       log('Gemini response: ${response?.output}');
       // Handle potential null response or empty output
