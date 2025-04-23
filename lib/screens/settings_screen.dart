@@ -8,7 +8,7 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Settings',
-          style: TextStyle(color: AppColors.accentYellow),
+          style: TextStyle(color: const Color.fromARGB(255, 64, 140, 255)),
         ),
       ),
       body: Container(
@@ -16,7 +16,7 @@ class SettingsScreen extends StatelessWidget {
         child: Center(
           child: Text(
             'Settings Page',
-            style: TextStyle(fontSize: 18, color: AppColors.accentYellow),
+            style: TextStyle(fontSize: 18, color: const Color.fromARGB(255, 64, 140, 255)),
           ),
         ),
       ),

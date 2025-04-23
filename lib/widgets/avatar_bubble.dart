@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 import '../theme/app_theme.dart';
 
@@ -45,14 +46,22 @@ class AvatarBubble extends StatelessWidget {
         width: 40,
         child: LinearProgressIndicator( 
           backgroundColor: Colors.transparent,
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentYellow),
+          valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 64, 140, 255)),
+        ),
+      );
+    } else if (!isUser) {
+      // Render bot messages as markdown
+      bubbleContent = MarkdownBody(
+        data: text,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(color: textColor, fontSize: 16),
         ),
       );
     } else {
-       bubbleContent = Text(
-          text,
-          style: TextStyle(color: textColor, fontSize: 16),
-        );
+      bubbleContent = Text(
+        text,
+        style: TextStyle(color: textColor, fontSize: 16),
+      );
     }
 
     final bubble = Container(

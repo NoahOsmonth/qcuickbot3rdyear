@@ -46,7 +46,7 @@ class ChatInputBar extends StatelessWidget {
               icon: Icon(
                 Icons.send,
                 color:
-                    isLoading ? AppColors.sidebarCard : AppColors.accentYellow,
+                    isLoading ? AppColors.sidebarCard : const Color.fromARGB(255, 64, 140, 255),
               ),
               onPressed: isLoading ? null : onSend,
             ),
