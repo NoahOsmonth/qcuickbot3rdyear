@@ -1,32 +1,37 @@
-import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:developer';
 import '../models/chat_message.dart';
 
 class GeminiService {
-  final Gemini _gemini =
-      Gemini.instance; // Access the globally initialized instance
+  // API key for Gemini
+  static const String apiKey = 'AIzaSyBEmBvYmE6Y14dZ6RZgAjByh7dPxdYOCQI';
 
-  // Constructor no longer needs apiKey
+  // Define the Gemini model and chat session
+  late final GenerativeModel _model;
+  late final ChatSession _chatSession;
+
   GeminiService() {
-    // Gemini.init removed - handled in main.dart
-    log('Gemini Service Instantiated'); // Updated log message
+    _model = GenerativeModel(
+      model: 'gemini-2.5-flash-preview-04-17',
+      apiKey: apiKey,
+    );
+    _chatSession = _model.startChat();
+    log('Gemini Service Instantiated with 2.5 Flash model');
   }
 
   // Sends a message to the Gemini model using full conversation history
   Future<String> sendMessage(List<ChatMessage> history, String message) async {
     try {
-      // Build messages list from history
-      final messages = history.map((m) => Content(
-            parts: [Part.text(m.text)],
-            role: m.isUser ? 'user' : 'assistant',
-          )).toList();
-      // Append new user message
-      messages.add(Content(parts: [Part.text(message)], role: 'user'));
-      final response = await _gemini.chat(messages, modelName: 'gemini-2.5-flash-preview-04-17');
-
-      log('Gemini response: ${response?.output}');
+      // Convert history to the new format and add to chat session
+      for (final msg in history) {
+        await _chatSession.sendMessage(Content.text(msg.text));
+      }
+      
+      // Send the new message
+      final response = await _chatSession.sendMessage(Content.text(message));
+      
       // Handle potential null response or empty output
-      return response?.output?.trim() ?? 'Sorry, I could not process that.';
+      return response?.text ?? 'Sorry, I could not process that.';
     } catch (e, stackTrace) {
       log('Gemini chat error: $e');
       log('StackTrace: $stackTrace');
