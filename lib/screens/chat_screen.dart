@@ -7,6 +7,8 @@ import '../services/gemini_service.dart';
 import '../theme/app_theme.dart';
 import 'dart:developer';
 
+final geminiServiceProvider = Provider<GeminiService>((ref) => GeminiService());
+
 // --- State Definition ---
 @immutable // Good practice for state classes
 class ChatState {
@@ -47,7 +49,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     try {
       // Use the injected GeminiService instance
-      final responseText = await _geminiService.sendMessage(text);
+      final responseText = await _geminiService.sendMessage(state.messages, text);
       final botMessage = ChatMessage(text: responseText, isUser: false);
 
       // Update state: add bot message and set loading false

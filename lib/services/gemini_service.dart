@@ -1,22 +1,8 @@
 import 'package:flutter_gemini/flutter_gemini.dart';
 import 'dart:developer';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-// --- Provider Definition ---
-
-// Provider for the GeminiService instance
-final geminiServiceProvider = Provider<GeminiService>((ref) {
-  // API Key definition and check removed - handled in main.dart
-  // Gemini.init removed - handled in main.dart
-
-  // Simply return the service instance; initialization is done globally.
-  return GeminiService();
-});
-
-// --- Gemini Service Class ---
+import '../models/chat_message.dart';
 
 class GeminiService {
-  // API key field removed - not needed here anymore
   final Gemini _gemini =
       Gemini.instance; // Access the globally initialized instance
 
@@ -26,13 +12,17 @@ class GeminiService {
     log('Gemini Service Instantiated'); // Updated log message
   }
 
-  // Sends a message to the Gemini model and returns the response
-  // Method is now non-static
-  Future<String> sendMessage(String message) async {
+  // Sends a message to the Gemini model using full conversation history
+  Future<String> sendMessage(List<ChatMessage> history, String message) async {
     try {
-      final response = await _gemini.chat([
-        Content(parts: [Part.text(message)], role: 'user'),
-      ], modelName: 'gemini-2.0-flash'); // Updated model name if needed
+      // Build messages list from history
+      final messages = history.map((m) => Content(
+            parts: [Part.text(m.text)],
+            role: m.isUser ? 'user' : 'assistant',
+          )).toList();
+      // Append new user message
+      messages.add(Content(parts: [Part.text(message)], role: 'user'));
+      final response = await _gemini.chat(messages, modelName: 'gemini-2.0-flash');
 
       log('Gemini response: ${response?.output}');
       // Handle potential null response or empty output
