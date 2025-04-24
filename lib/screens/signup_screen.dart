@@ -17,6 +17,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true, _obscureConfirm = true;
+  final _pwdRegex = RegExp(r'^(?=.*\d)(?=.*[@$!%*#?&]).{8,}$');
 
   @override
   void dispose() {
@@ -62,8 +64,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext c) => Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
       body: Center(
         child: SingleChildScrollView(
@@ -94,11 +95,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || value.length < 6) {
-                      return 'Password must be at least 6 characters';
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  obscureText: _obscurePassword,
+                  validator: (v) {
+                    if (v == null || !_pwdRegex.hasMatch(v)) {
+                      return 'Min\u200B 8 chars, include number & symbol';
                     }
                     return null;
                   },
@@ -106,12 +113,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _confirmPasswordController,
-                  decoration: const InputDecoration(labelText: 'Confirm Password'),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  obscureText: _obscureConfirm,
+                  validator: (v) {
+                    if (v != _passwordController.text) return 'Passwords do not match';
                     return null;
                   },
                 ),
@@ -152,5 +163,4 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ),
       ),
     );
-  }
 }

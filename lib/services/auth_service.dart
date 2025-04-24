@@ -1,6 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../utils/supabase_client.dart'; // Your Supabase client instance
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../utils/supabase_client.dart';
 
 class AuthService {
   final GoTrueClient _auth = supabase.auth;
@@ -50,13 +50,24 @@ class AuthService {
       print('Unexpected Error (SignOut): $e');
     }
   }
+
+  /// Send magic link / reset‑password email
+  Future<void> resetPassword(String email) async {
+    try {
+      await _auth.resetPasswordForEmail(email);
+    } on AuthException catch (e) {
+      print('Supabase Auth Error (ResetPassword): ${e.message}');
+      rethrow;
+    } catch (e) {
+      print('Unexpected Error (ResetPassword): $e');
+      rethrow;
+    }
+  }
 }
 
-// Provider for the AuthService
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+final authServiceProvider = Provider((ref) => AuthService());
 
-// StreamProvider for auth state changes
-final authStateProvider = StreamProvider<User?>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.authStateChanges;
-});
+// Stream provider for authentication state
+final authStateProvider = StreamProvider<User?>(
+  (ref) => ref.watch(authServiceProvider).authStateChanges,
+);
