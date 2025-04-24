@@ -43,15 +43,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final Ref ref;
   final String sessionId;
   final GeminiService _geminiService;
+  bool _isInitialized = false;
 
   ChatNotifier(this.ref, this.sessionId)
       : _geminiService = ref.read(geminiServiceProvider),
         super(ChatState(sessionId: sessionId)) {
-    // Load existing messages for this session
     _loadMessages();
   }
 
   Future<void> _loadMessages() async {
+    if (_isInitialized) return;
+
     final user = supabase.auth.currentUser;
     if (user == null) {
       log('[Chat] No user logged in, skipping message loading for session: $sessionId');
@@ -59,6 +61,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
 
     try {
+      log('[Chat] Starting to load messages for session: $sessionId');
       final response = await supabase
           .from('chat_messages')
           .select()
@@ -66,16 +69,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
           .eq('user_id', user.id)
           .order('created_at');
 
-      log('[Chat] Loaded ${response.length} messages for session: $sessionId');
-
       final messages = response.map((data) => ChatMessage(
             text: data['content'],
             isUser: data['is_user'],
           )).toList();
 
-      state = state.copyWith(messages: messages);
-    } catch (e) {
+      log('[Chat] Successfully loaded ${messages.length} messages for session: $sessionId');
+      
+      if (mounted) {
+        state = state.copyWith(messages: messages);
+        _isInitialized = true;
+      }
+    } catch (e, stackTrace) {
       log('[Chat] Error loading messages for session $sessionId: $e');
+      log('[Chat] Stack trace: $stackTrace');
     }
   }
 
@@ -87,6 +94,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
 
     try {
+      log('[Chat] Saving ${message.isUser ? "user" : "bot"} message in session: $sessionId');
       await supabase.from('chat_messages').insert({
         'session_id': sessionId,
         'user_id': user.id,
@@ -94,9 +102,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         'is_user': message.isUser,
         'created_at': DateTime.now().toIso8601String(),
       });
-      log('[Chat] Saved ${message.isUser ? "user" : "bot"} message in session: $sessionId');
-    } catch (e) {
+      log('[Chat] Successfully saved message in session: $sessionId');
+    } catch (e, stackTrace) {
       log('[Chat] Error saving message in session $sessionId: $e');
+      log('[Chat] Stack trace: $stackTrace');
     }
   }
 
@@ -105,12 +114,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final userMessage = ChatMessage(text: text, isUser: true);
 
-    // Update state and save user message
+    // Update state with user message
     state = state.copyWith(
       messages: [...state.messages, userMessage],
       isLoading: true,
     );
+
+    // Save user message
     await _saveMessage(userMessage);
+    log('[Chat] User message sent and saved in session: $sessionId');
 
     // Update session title if it's the first user message
     if (state.messages.where((m) => m.isUser).length == 1) {
@@ -121,7 +133,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
         orElse: () => ChatSessionHeader(id: '', title: ''),
       );
       if (currentSession.id.isNotEmpty && currentSession.title == 'New Chat') {
-        historyNotifier.updateSessionTitle(sessionId, text);
+        await historyNotifier.updateSessionTitle(sessionId, text);
+        log('[Chat] Updated session title for first message: $sessionId');
       }
     }
 
@@ -129,23 +142,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final responseText = await _geminiService.sendMessage(state.messages, text);
       final botMessage = ChatMessage(text: responseText, isUser: false);
 
-      // Update state and save bot message
-      state = state.copyWith(
-        messages: [...state.messages, botMessage],
-        isLoading: false,
-      );
+      // Update state with bot message
+      if (mounted) {
+        state = state.copyWith(
+          messages: [...state.messages, botMessage],
+          isLoading: false,
+        );
+      }
+
+      // Save bot message
       await _saveMessage(botMessage);
-    } catch (e) {
-      log('[Chat] Error sending message in session $sessionId: $e');
+      log('[Chat] Bot response saved in session: $sessionId');
+    } catch (e, stackTrace) {
+      log('[Chat] Error in session $sessionId: $e');
+      log('[Chat] Stack trace: $stackTrace');
+      
       final errorMessage = ChatMessage(
         text: 'Error: Could not get response.',
         isUser: false,
       );
-      state = state.copyWith(
-        messages: [...state.messages, errorMessage],
-        isLoading: false,
-      );
-      await _saveMessage(errorMessage); // Save error message too
+      
+      if (mounted) {
+        state = state.copyWith(
+          messages: [...state.messages, errorMessage],
+          isLoading: false,
+        );
+      }
+      
+      await _saveMessage(errorMessage);
     }
   }
 }

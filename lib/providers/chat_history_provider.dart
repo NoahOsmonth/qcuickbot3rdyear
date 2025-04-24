@@ -18,7 +18,7 @@ class ChatHistoryState {
   ChatHistoryState copyWith({
     List<ChatSessionHeader>? sessions,
     String? activeSessionId,
-    bool forceActiveNull = false, // Helper to explicitly set activeSessionId to null
+    bool forceActiveNull = false,
   }) {
     return ChatHistoryState(
       sessions: sessions ?? this.sessions,
@@ -27,21 +27,26 @@ class ChatHistoryState {
   }
 }
 
-// --- Chat History Notifier ---
 class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
   ChatHistoryNotifier() : super(const ChatHistoryState()) {
-    // Initialize by loading user's chats from Supabase
     _loadUserChats();
   }
 
+  bool _isLoading = false;
+
   Future<void> _loadUserChats() async {
+    if (_isLoading) return;
+    _isLoading = true;
+
     final user = supabase.auth.currentUser;
     if (user == null) {
       log('[ChatHistory] No user logged in, skipping chat loading');
+      _isLoading = false;
       return;
     }
 
     try {
+      log('[ChatHistory] Loading chats for user: ${user.id}');
       final response = await supabase
           .from('chat_sessions')
           .select()
@@ -56,19 +61,28 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
               title: data['title'],
             )).toList();
 
-        state = state.copyWith(
-          sessions: sessions,
-          activeSessionId: sessions.first.id, // Set most recent chat as active
-        );
+        if (mounted) {
+          state = state.copyWith(
+            sessions: sessions,
+            activeSessionId: sessions.first.id,
+          );
+        }
+        log('[ChatHistory] Set active session to: ${sessions.first.id}');
       } else {
-        startNewChat(activate: true); // Create first chat if none exist
+        log('[ChatHistory] No existing chats found, creating new chat');
+        if (mounted) {
+          startNewChat(activate: true);
+        }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       log('[ChatHistory] Error loading chats: $e');
+      log('[ChatHistory] Stack trace: $stackTrace');
       // Start with empty state and create new chat
-      if (state.sessions.isEmpty) {
+      if (mounted && state.sessions.isEmpty) {
         startNewChat(activate: true);
       }
+    } finally {
+      _isLoading = false;
     }
   }
 
@@ -79,25 +93,30 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
 
     try {
       if (user != null) {
+        log('[ChatHistory] Creating new chat in Supabase: $newSessionId for user ${user.id}');
         await supabase.from('chat_sessions').insert({
           'id': newSessionId,
           'user_id': user.id,
           'title': 'New Chat',
           'created_at': DateTime.now().toIso8601String(),
         });
-        log('[ChatHistory] Created new chat in Supabase: $newSessionId for user ${user.id}');
+        log('[ChatHistory] Successfully created chat in Supabase');
       }
-    } catch (e) {
-      log('[ChatHistory] Error creating chat in Supabase: $e');
-    }
 
-    final updatedSessions = [...state.sessions, newSessionHeader];
-    state = state.copyWith(
-      sessions: updatedSessions,
-      activeSessionId: activate ? newSessionId : state.activeSessionId,
-    );
-    log('[ChatHistory] Started new chat locally: $newSessionId, Active: ${state.activeSessionId}');
-    return newSessionId;
+      if (mounted) {
+        final updatedSessions = [...state.sessions, newSessionHeader];
+        state = state.copyWith(
+          sessions: updatedSessions,
+          activeSessionId: activate ? newSessionId : state.activeSessionId,
+        );
+      }
+      log('[ChatHistory] Updated local state with new chat: $newSessionId');
+      return newSessionId;
+    } catch (e, stackTrace) {
+      log('[ChatHistory] Error creating new chat: $e');
+      log('[ChatHistory] Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> updateSessionTitle(String sessionId, String newTitle) async {
@@ -107,20 +126,24 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
     if (sessionIndex != -1 && state.sessions[sessionIndex].title != newTitle) {
       try {
         if (user != null) {
+          log('[ChatHistory] Updating chat title in Supabase: $sessionId');
           await supabase
               .from('chat_sessions')
               .update({'title': newTitle})
               .eq('id', sessionId)
               .eq('user_id', user.id);
-          log('[ChatHistory] Updated chat title in Supabase: $sessionId to "$newTitle"');
+          log('[ChatHistory] Successfully updated chat title in Supabase');
         }
 
-        final updatedSessions = List<ChatSessionHeader>.from(state.sessions);
-        updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
-        state = state.copyWith(sessions: updatedSessions);
-        log('[ChatHistory] Updated chat title locally: $sessionId to "$newTitle"');
-      } catch (e) {
+        if (mounted) {
+          final updatedSessions = List<ChatSessionHeader>.from(state.sessions);
+          updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
+          state = state.copyWith(sessions: updatedSessions);
+        }
+        log('[ChatHistory] Updated local state with new title for session: $sessionId');
+      } catch (e, stackTrace) {
         log('[ChatHistory] Error updating chat title: $e');
+        log('[ChatHistory] Stack trace: $stackTrace');
       }
     }
   }
@@ -130,37 +153,43 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
     
     try {
       if (user != null) {
+        log('[ChatHistory] Deleting chat from Supabase: $sessionId');
         await supabase
             .from('chat_sessions')
             .delete()
             .eq('id', sessionId)
             .eq('user_id', user.id);
-        log('[ChatHistory] Deleted chat from Supabase: $sessionId');
+        log('[ChatHistory] Successfully deleted chat from Supabase');
       }
-    } catch (e) {
-      log('[ChatHistory] Error deleting chat from Supabase: $e');
-    }
 
-    final updatedSessions = state.sessions.where((s) => s.id != sessionId).toList();
-    String? newActiveSessionId = state.activeSessionId;
+      final updatedSessions = state.sessions.where((s) => s.id != sessionId).toList();
+      String? newActiveSessionId = state.activeSessionId;
 
-    if (newActiveSessionId == sessionId) {
-      if (updatedSessions.isNotEmpty) {
-        newActiveSessionId = updatedSessions.last.id;
-      } else {
-        newActiveSessionId = null;
+      if (newActiveSessionId == sessionId) {
+        if (updatedSessions.isNotEmpty) {
+          newActiveSessionId = updatedSessions.last.id;
+          log('[ChatHistory] Setting new active session: $newActiveSessionId');
+        } else {
+          newActiveSessionId = null;
+          log('[ChatHistory] No sessions left after deletion');
+        }
       }
-    }
 
-    state = state.copyWith(
-      sessions: updatedSessions,
-      activeSessionId: newActiveSessionId,
-      forceActiveNull: newActiveSessionId == null && state.activeSessionId == sessionId,
-    );
-    log('[ChatHistory] Deleted chat locally: $sessionId. New active: $newActiveSessionId');
+      if (mounted) {
+        state = state.copyWith(
+          sessions: updatedSessions,
+          activeSessionId: newActiveSessionId,
+          forceActiveNull: newActiveSessionId == null && state.activeSessionId == sessionId,
+        );
+      }
 
-    if (updatedSessions.isEmpty && newActiveSessionId == null) {
-      startNewChat(activate: true);
+      if (updatedSessions.isEmpty && newActiveSessionId == null) {
+        log('[ChatHistory] Creating new chat after deleting last one');
+        await startNewChat(activate: true);
+      }
+    } catch (e, stackTrace) {
+      log('[ChatHistory] Error deleting chat: $e');
+      log('[ChatHistory] Stack trace: $stackTrace');
     }
   }
 
