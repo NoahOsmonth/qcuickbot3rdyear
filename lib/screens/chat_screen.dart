@@ -3,98 +3,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_message.dart';
 import '../widgets/avatar_bubble.dart';
 import '../widgets/chat_input_bar.dart';
-import '../services/gemini_service.dart';
+import '../services/gemini_service.dart'; // Keep for geminiServiceProvider
 import '../theme/app_theme.dart';
 import 'dart:developer';
+import '../widgets/drawer/chat_history_list.dart';
+import '../widgets/drawer/drawer_header.dart';
+import '../widgets/drawer/settings_tile.dart';
+import '../providers/chat_provider.dart'; // Import chat provider
+import '../providers/chat_history_provider.dart'; // Import history provider
+import '../models/chat_session.dart'; // Import session header model
 
+// Keep Gemini Service Provider here or move to a dedicated services/providers file
 final geminiServiceProvider = Provider<GeminiService>((ref) => GeminiService());
 
-// --- State Definition ---
-@immutable // Good practice for state classes
-class ChatState {
-  final List<ChatMessage> messages;
-  final bool isLoading;
-
-  const ChatState({this.messages = const [], this.isLoading = false});
-
-  ChatState copyWith({List<ChatMessage>? messages, bool? isLoading}) {
-    return ChatState(
-      messages: messages ?? this.messages,
-      isLoading: isLoading ?? this.isLoading,
-    );
-  }
-}
-
-// --- State Notifier ---
-class ChatNotifier extends StateNotifier<ChatState> {
-  final Ref ref;
-  // Store the GeminiService instance obtained via ref
-  final GeminiService _geminiService;
-
-  // Pass ref to the constructor and read the GeminiService provider
-  ChatNotifier(this.ref)
-    : _geminiService = ref.read(geminiServiceProvider),
-      super(const ChatState()); // Initial state
-
-  Future<void> sendMessage(String text) async {
-    if (text.isEmpty) return;
-
-    final userMessage = ChatMessage(text: text, isUser: true);
-
-    // Update state: add user message and set loading true
-    state = state.copyWith(
-      messages: [...state.messages, userMessage],
-      isLoading: true,
-    );
-
-    try {
-      // Use the injected GeminiService instance
-      final responseText = await _geminiService.sendMessage(state.messages, text);
-      final botMessage = ChatMessage(text: responseText, isUser: false);
-
-      // Update state: add bot message and set loading false
-      state = state.copyWith(
-        messages: [...state.messages, botMessage],
-        isLoading: false,
-      );
-    } catch (e) {
-      log('Error sending message: $e');
-      final errorMessage = ChatMessage(
-        text: 'Error: Could not get response.',
-        isUser: false,
-      );
-      // Update state: add error message and set loading false
-      state = state.copyWith(
-        messages: [...state.messages, errorMessage],
-        isLoading: false,
-      );
-    }
-  }
-}
-
-// --- Provider Definition ---
-final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier(ref);
-});
-
 // --- UI Widget ---
-// Change StatefulWidget to ConsumerStatefulWidget
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  // Change State to ConsumerState
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-// Change State to ConsumerState<ChatScreen>
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-
-  // Remove local state variables for messages and loading
-  // List<ChatMessage> _messages = [];
-  // bool _isLoading = false;
 
   @override
   void dispose() {
@@ -104,177 +36,198 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+    // Debounce or delay slightly to ensure layout is complete
+    Future.delayed(const Duration(milliseconds: 50), () {
+       if (_scrollController.hasClients) {
+         _scrollController.animateTo(
+           _scrollController.position.maxScrollExtent,
+           duration: const Duration(milliseconds: 300),
+           curve: Curves.easeOut,
+         );
+       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Watch the provider to get the current state
-    final chatState = ref.watch(chatProvider);
+    // Get active session ID and the list of all sessions
+    final historyState = ref.watch(chatHistoryProvider);
+    final activeSessionId = historyState.activeSessionId;
+    final sessions = historyState.sessions;
+
+    log('Building ChatScreen. Active session: $activeSessionId');
+
+    // If there's no active session (e.g., during init or error), handle gracefully
+    if (activeSessionId == null) {
+      log('No active session ID found. Displaying loading or empty state.');
+      return Scaffold(
+        appBar: AppBar(title: const Text('QCUIckBot')),
+        drawer: _buildDrawer(context, sessions, null), // Pass null for activeSessionId
+        body: const Center(child: CircularProgressIndicator()), // Or a welcome message
+      );
+    }
+
+    // Watch the *specific* provider for the active session
+    final chatState = ref.watch(chatProvider(activeSessionId));
     final messages = chatState.messages;
     final isLoading = chatState.isLoading;
 
-    // Listen to changes in the chat state, specifically the messages list
-    ref.listen<ChatState>(chatProvider, (previousState, newState) {
-      // Check if the number of messages has changed
+    // Listen for changes in the active session's messages to scroll
+    ref.listen<ChatState>(chatProvider(activeSessionId), (previousState, newState) {
       if (previousState?.messages.length != newState.messages.length) {
-        // Schedule scroll after the frame renders
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        _scrollToBottom();
       }
     });
+
+    // Get the title for the AppBar from the history state
+    // Ensure orElse provides a default ChatSessionHeader
+    final activeSessionHeader = sessions.firstWhere((s) => s.id == activeSessionId, orElse: () => const ChatSessionHeader(id: '', title: 'Chat'));
+    final activeSessionTitle = activeSessionHeader.title;
+
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Text(
-          'QCUIckBot',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          activeSessionTitle, // Use dynamic title
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis, // Handle long titles
         ),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            tooltip: 'New Chat',
+            onPressed: () {
+              ref.read(chatHistoryProvider.notifier).startNewChat(activate: true);
+              // No need to pop drawer here as it's in the AppBar
+            },
+          ),
+        ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: AppColors.sidebarCard),
-              child: Text(
-                'QCUIckBot',
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.chat),
-              title: Text('Home'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/settings');
-              },
-            ),
-          ],
-        ),
-      ),
+      drawer: _buildDrawer(context, sessions, activeSessionId), // Pass sessions and active ID
       body: Container(
         color: AppColors.mainBackground,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
-              child: Text(
-                'Today',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            // Removed 'Today' text for simplicity with history
+            // Padding(
+            //   padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
+            //   child: Text(
+            //     'Today',
+            //     style: TextStyle(
+            //       color: Colors.grey[600],
+            //       fontWeight: FontWeight.w500,
+            //     ),
+            //   ),
+            // ),
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                reverse: false,
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                itemCount:
-                    messages.length +
-                    (isLoading ? 1 : 0), // Add 1 for loading indicator
-                itemBuilder: (context, index) {
-                  if (isLoading && index == messages.length) {
-                    // Show loading indicator at the bottom using AvatarBubble
-                    return Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        // Create a dummy bot message for the thinking indicator
-                        child: AvatarBubble(
-                          message: ChatMessage(
-                            text: '...',
-                            isUser: false,
-                            type: MessageType.text,
-                          ),
-                          isThinking: true,
-                        ),
-                      ),
-                    );
-                  }
-                  final message = messages[index];
+              child: messages.isEmpty && !isLoading
+                  ? Center(
+                      child: Text(
+                      'Ask me anything!',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ))
+                  : ListView.builder(
+                      controller: _scrollController,
+                      reverse: false, // Keep false for natural chat flow
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0), // Add vertical padding
+                      itemCount: messages.length + (isLoading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (isLoading && index == messages.length) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: AvatarBubble(
+                                message: ChatMessage(
+                                  text: '...',
+                                  isUser: false,
+                                  type: MessageType.text,
+                                ),
+                                isThinking: true,
+                              ),
+                            ),
+                          );
+                        }
+                        if (index >= messages.length) {
+                           // Should not happen with the check above, but safeguard
+                           return const SizedBox.shrink();
+                        }
+                        final message = messages[index];
 
-                  // Check if the message type is quickReplies
-                  if (message.type == MessageType.quickReplies &&
-                      message.quickReplies != null) {
-                    // Render the quick reply buttons
-                    return Padding(
-                      padding: const EdgeInsets.only(
-                        left: 50.0,
-                        top: 4.0,
-                        bottom: 4.0,
-                      ), // Indent replies slightly
-                      child: Wrap(
-                        // Use Wrap for better spacing if buttons overflow
-                        spacing: 8.0, // Horizontal space between buttons
-                        runSpacing: 4.0, // Vertical space if they wrap
-                        children:
-                            message.quickReplies!
-                                .map(
-                                  (reply) => ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      // Define button style (consider moving to theme)
-                                      backgroundColor: AppColors.botBubble,
-                                      foregroundColor: AppColors.bubbleText,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                        side: BorderSide(
-                                          color: AppColors.sidebarCard,
+                        // Quick replies logic remains the same
+                        if (message.type == MessageType.quickReplies &&
+                            message.quickReplies != null) {
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              left: 50.0, top: 4.0, bottom: 4.0),
+                            child: Wrap(
+                              spacing: 8.0,
+                              runSpacing: 4.0,
+                              children: message.quickReplies!
+                                  .map((reply) => ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.botBubble,
+                                          foregroundColor: AppColors.bubbleText,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(18),
+                                            side: BorderSide(color: AppColors.sidebarCard),
+                                          ),
+                                          elevation: 1,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         ),
-                                      ),
-                                      elevation: 1,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      // Send the reply using the notifier
-                                      ref
-                                          .read(chatProvider.notifier)
-                                          .sendMessage(reply);
-                                    },
-                                    child: Text(reply),
-                                  ),
-                                )
-                                .toList(),
-                      ),
-                    );
-                  } else {
-                    // Otherwise, render the standard AvatarBubble for text messages
-                    return AvatarBubble(message: message);
-                  }
-                },
-              ),
+                                        onPressed: () {
+                                          // Send reply using the *active* session's notifier
+                                          ref.read(chatProvider(activeSessionId).notifier).sendMessage(reply);
+                                        },
+                                        child: Text(reply),
+                                      ))
+                                  .toList(),
+                            ),
+                          );
+                        } else {
+                          return AvatarBubble(message: message);
+                        }
+                      },
+                    ),
             ),
             ChatInputBar(
               controller: _controller,
               onSend: () {
                 final text = _controller.text;
-                _controller.clear();
-                // Read the notifier and call the method to send message
-                ref.read(chatProvider.notifier).sendMessage(text);
-                // No need to call _scrollToBottom here, build method handles it
+                if (text.isNotEmpty) {
+                  _controller.clear();
+                  // Send message using the *active* session's notifier
+                  ref.read(chatProvider(activeSessionId).notifier).sendMessage(text);
+                }
               },
-              isLoading: isLoading, // Pass the isLoading state here
+              isLoading: isLoading,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Helper method to build the drawer UI
+  Widget _buildDrawer(BuildContext context, List<ChatSessionHeader> sessions, String? activeSessionId) {
+    // final historyNotifier = ref.read(chatHistoryProvider.notifier); // Moved to ChatHistoryList
+
+    return Drawer(
+      child: Column( // Use Column for layout flexibility
+        children: [
+          // Use the extracted DrawerHeaderWidget
+          const DrawerHeaderWidget(),
+          const Divider(height: 1, thickness: 1),
+          // Use the extracted ChatHistoryList widget
+          ChatHistoryList(
+            sessions: sessions,
+            activeSessionId: activeSessionId,
+          ),
+          const Divider(height: 1, thickness: 1),
+          // Use the extracted SettingsTile widget
+          const SettingsTile(),
+        ],
       ),
     );
   }

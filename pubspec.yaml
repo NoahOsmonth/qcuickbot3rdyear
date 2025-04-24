@@ -36,7 +36,8 @@ dependencies:
   flutter_gemini: ^3.0.0
   google_generative_ai: ^0.4.0
   flutter_markdown: ^0.6.18 # Added for markdown support
-
+  uuid: ^4.4.0 # Add uuid package
+  supabase_flutter: ^2.5.0 # Add Supabase
 dev_dependencies:
   flutter_test:
     sdk: flutter
