@@ -8,10 +8,10 @@ class AvatarBubble extends StatelessWidget {
   final bool isThinking;
 
   const AvatarBubble({
-    Key? key,
+    super.key,
     required this.message,
     this.isThinking = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class AvatarBubble extends StatelessWidget {
           );
     final avatar = avatarUrl != null
         ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl), radius: 18, backgroundColor: AppColors.sidebar)
-        : CircleAvatar(child: Icon(isUser ? Icons.person : Icons.android, color: AppColors.accentBlue), radius: 18, backgroundColor: AppColors.sidebarCard);
+        : CircleAvatar(radius: 18, backgroundColor: AppColors.sidebarCard, child: Icon(isUser ? Icons.person : Icons.android, color: AppColors.accentBlue));
     
     final Widget bubbleContent;
     if (isThinking) {

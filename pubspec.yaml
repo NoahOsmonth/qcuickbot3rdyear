@@ -32,10 +32,10 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^2.5.1
   cupertino_icons: ^1.0.8
-  http: ^1.3.0
+  http: 1.3.0
   flutter_gemini: ^3.0.0
-  google_generative_ai: ^0.4.7
-  flutter_markdown: ^0.7.7
+  google_generative_ai: ^0.4.0
+  flutter_markdown: ^0.6.18 # Added for markdown support
 
 dev_dependencies:
   flutter_test:

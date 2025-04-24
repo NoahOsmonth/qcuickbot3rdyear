@@ -80,6 +80,8 @@ final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
 // --- UI Widget ---
 // Change StatefulWidget to ConsumerStatefulWidget
 class ChatScreen extends ConsumerStatefulWidget {
+  const ChatScreen({super.key});
+
   @override
   // Change State to ConsumerState
   ConsumerState<ChatScreen> createState() => _ChatScreenState();

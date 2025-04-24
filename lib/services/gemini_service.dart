@@ -46,6 +46,14 @@ Attention Future QCU Students!
       SF Address: Bago Bantay, Quezon City, Metro Manila
       Batasan Address: Batasan Rd, Quezon City, Metro Manila
       Main Campus Address: Address: 673 Quirino Hwy, San Bartolome, Novaliches, Quezon City
+      FOUNDATION COURSE ON INTELLECTUAL PROPERTY
+      When: April 25, 2025 (Friday)
+      Time: 9:00 AM – 5:00 PM
+      Where: Online via Zoom
+      Organized by: Quezon City University – Innovation and Technology Support Office (QCU-ITSO)
+      The Foundation Course on Intellectual Property is a full-day virtual training designed to provide participants with a solid understanding of the fundamental concepts of intellectual property (IP). This initiative aims to promote awareness and appreciation of IP rights, their importance in research, innovation, and creative endeavors, and the processes involved in protecting intellectual property.
+      Whether you're a student, educator, researcher, or innovator, this course will help you build a strong foundation in IP and empower you to contribute to a more innovation-driven environment within the university and beyond.
+      Registration Link: https://tinyurl.com/v57t6pvz
       '''
             ),
     );
@@ -65,7 +73,7 @@ Attention Future QCU Students!
       final response = await _chatSession.sendMessage(Content.text(message));
       
       // Handle potential null response or empty output
-      return response?.text ?? 'Sorry, I could not process that.';
+      return response.text ?? 'Sorry, I could not process that.';
     } catch (e, stackTrace) {
       log('Gemini chat error: $e');
       log('StackTrace: $stackTrace');

@@ -8,11 +8,11 @@ class ChatInputBar extends StatelessWidget {
   final bool isLoading;
 
   const ChatInputBar({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSend,
     required this.isLoading,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
