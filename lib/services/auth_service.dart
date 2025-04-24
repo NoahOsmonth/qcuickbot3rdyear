@@ -6,7 +6,11 @@ class AuthService {
   final GoTrueClient _auth = supabase.auth;
 
   // Get current user stream
-  Stream<User?> get authStateChanges => _auth.onAuthStateChange.map((data) => data.session?.user);
+  Stream<User?> get authStateChanges => _auth.onAuthStateChange.map((data) {
+    final user = data.session?.user;
+    print('[AuthState] session: \\${data.session}, user: \\${user}');
+    return user;
+  });
 
   // Get current user (synchronous)
   User? get currentUser => _auth.currentUser;

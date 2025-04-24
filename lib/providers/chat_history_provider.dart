@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer';
 import '../models/chat_session.dart';
+import '../utils/supabase_client.dart';
 
 final _uuid = Uuid();
 
@@ -29,71 +30,147 @@ class ChatHistoryState {
 // --- Chat History Notifier ---
 class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
   ChatHistoryNotifier() : super(const ChatHistoryState()) {
-    // Initialize with one default chat if no history exists (implement loading later)
-    if (state.sessions.isEmpty) {
-      startNewChat(activate: true); // Start and activate the first chat
+    // Initialize by loading user's chats from Supabase
+    _loadUserChats();
+  }
+
+  Future<void> _loadUserChats() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      log('[ChatHistory] No user logged in, skipping chat loading');
+      return;
+    }
+
+    try {
+      final response = await supabase
+          .from('chat_sessions')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      log('[ChatHistory] Loaded ${response.length} chats for user ${user.id}');
+
+      if (response.isNotEmpty) {
+        final sessions = response.map((data) => ChatSessionHeader(
+              id: data['id'],
+              title: data['title'],
+            )).toList();
+
+        state = state.copyWith(
+          sessions: sessions,
+          activeSessionId: sessions.first.id, // Set most recent chat as active
+        );
+      } else {
+        startNewChat(activate: true); // Create first chat if none exist
+      }
+    } catch (e) {
+      log('[ChatHistory] Error loading chats: $e');
+      // Start with empty state and create new chat
+      if (state.sessions.isEmpty) {
+        startNewChat(activate: true);
+      }
     }
   }
 
-  // Creates a new session, adds it to the list, and optionally activates it
-  String startNewChat({bool activate = true}) {
+  Future<String> startNewChat({bool activate = true}) async {
+    final user = supabase.auth.currentUser;
     final newSessionId = _uuid.v4();
     final newSessionHeader = ChatSessionHeader(id: newSessionId, title: 'New Chat');
-    final updatedSessions = [...state.sessions, newSessionHeader];
 
+    try {
+      if (user != null) {
+        await supabase.from('chat_sessions').insert({
+          'id': newSessionId,
+          'user_id': user.id,
+          'title': 'New Chat',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        log('[ChatHistory] Created new chat in Supabase: $newSessionId for user ${user.id}');
+      }
+    } catch (e) {
+      log('[ChatHistory] Error creating chat in Supabase: $e');
+    }
+
+    final updatedSessions = [...state.sessions, newSessionHeader];
     state = state.copyWith(
       sessions: updatedSessions,
       activeSessionId: activate ? newSessionId : state.activeSessionId,
     );
-    log('Started new chat: $newSessionId, Active: ${state.activeSessionId}');
-    return newSessionId; // Return the ID for potential immediate use
+    log('[ChatHistory] Started new chat locally: $newSessionId, Active: ${state.activeSessionId}');
+    return newSessionId;
   }
 
-  void setActiveSession(String sessionId) {
-    if (state.sessions.any((s) => s.id == sessionId)) {
-       log('Setting active session: $sessionId');
-      state = state.copyWith(activeSessionId: sessionId);
-    } else {
-       log('Attempted to set non-existent session active: $sessionId');
-    }
-  }
-
-  void updateSessionTitle(String sessionId, String newTitle) {
+  Future<void> updateSessionTitle(String sessionId, String newTitle) async {
+    final user = supabase.auth.currentUser;
     final sessionIndex = state.sessions.indexWhere((s) => s.id == sessionId);
+    
     if (sessionIndex != -1 && state.sessions[sessionIndex].title != newTitle) {
-      final updatedSessions = List<ChatSessionHeader>.from(state.sessions);
-      updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
-      state = state.copyWith(sessions: updatedSessions);
-       log('Updated title for session $sessionId to "$newTitle"');
+      try {
+        if (user != null) {
+          await supabase
+              .from('chat_sessions')
+              .update({'title': newTitle})
+              .eq('id', sessionId)
+              .eq('user_id', user.id);
+          log('[ChatHistory] Updated chat title in Supabase: $sessionId to "$newTitle"');
+        }
+
+        final updatedSessions = List<ChatSessionHeader>.from(state.sessions);
+        updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
+        state = state.copyWith(sessions: updatedSessions);
+        log('[ChatHistory] Updated chat title locally: $sessionId to "$newTitle"');
+      } catch (e) {
+        log('[ChatHistory] Error updating chat title: $e');
+      }
     }
   }
 
-  void deleteSession(String sessionId) {
-    final updatedSessions = state.sessions.where((s) => s.id != sessionId).toList();
+  Future<void> deleteSession(String sessionId) async {
+    final user = supabase.auth.currentUser;
+    
+    try {
+      if (user != null) {
+        await supabase
+            .from('chat_sessions')
+            .delete()
+            .eq('id', sessionId)
+            .eq('user_id', user.id);
+        log('[ChatHistory] Deleted chat from Supabase: $sessionId');
+      }
+    } catch (e) {
+      log('[ChatHistory] Error deleting chat from Supabase: $e');
+    }
 
-    // If the deleted session was the active one, activate another or none
+    final updatedSessions = state.sessions.where((s) => s.id != sessionId).toList();
     String? newActiveSessionId = state.activeSessionId;
+
     if (newActiveSessionId == sessionId) {
       if (updatedSessions.isNotEmpty) {
-        // Activate the most recent remaining session
         newActiveSessionId = updatedSessions.last.id;
       } else {
-        // No sessions left, set active to null (or start a new one immediately)
-        newActiveSessionId = null; // Or call startNewChat() here if preferred
+        newActiveSessionId = null;
       }
     }
 
     state = state.copyWith(
       sessions: updatedSessions,
       activeSessionId: newActiveSessionId,
-      forceActiveNull: newActiveSessionId == null && state.activeSessionId == sessionId, // Ensure null is set if needed
+      forceActiveNull: newActiveSessionId == null && state.activeSessionId == sessionId,
     );
-     log('Deleted session: $sessionId. New active: $newActiveSessionId');
+    log('[ChatHistory] Deleted chat locally: $sessionId. New active: $newActiveSessionId');
 
-     // If no sessions are left after deletion, create a new one
-     if (updatedSessions.isEmpty && newActiveSessionId == null) {
-       startNewChat(activate: true);
-     }
+    if (updatedSessions.isEmpty && newActiveSessionId == null) {
+      startNewChat(activate: true);
+    }
+  }
+
+  void setActiveSession(String sessionId) {
+    if (state.sessions.any((s) => s.id == sessionId)) {
+      log('[ChatHistory] Setting active session: $sessionId');
+      state = state.copyWith(activeSessionId: sessionId);
+    } else {
+      log('[ChatHistory] Attempted to set non-existent session active: $sessionId');
+    }
   }
 }
 
