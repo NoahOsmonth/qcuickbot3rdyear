@@ -4,6 +4,13 @@ import 'package:uuid/uuid.dart';
 import 'dart:developer';
 import '../models/chat_session.dart';
 import '../utils/supabase_client.dart';
+import '../services/auth_service.dart';
+
+// --- Provider ---
+final StateNotifierProvider<ChatHistoryNotifier, ChatHistoryState> chatHistoryProvider =
+    StateNotifierProvider<ChatHistoryNotifier, ChatHistoryState>((ref) {
+  return ChatHistoryNotifier(ref);
+});
 
 final _uuid = Uuid();
 
@@ -28,11 +35,27 @@ class ChatHistoryState {
 }
 
 class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
-  ChatHistoryNotifier() : super(const ChatHistoryState()) {
+  final Ref ref;
+  ChatHistoryNotifier(this.ref) : super(const ChatHistoryState()) {
+    // Listen to auth state changes
+    ref.listen(authStateProvider, (previous, next) {
+      next.whenData((user) {
+        if (user == null) {
+          // Clear history when user logs out
+          clearState();
+        }
+      });
+    });
     _loadUserChats();
   }
 
   bool _isLoading = false;
+
+  void clearState() {
+    log('[ChatHistory] Clearing state');
+    state = const ChatHistoryState();
+    _isLoading = false;
+  }
 
   Future<void> _loadUserChats() async {
     if (_isLoading) return;
@@ -194,16 +217,9 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
   }
 
   void setActiveSession(String sessionId) {
-    if (state.sessions.any((s) => s.id == sessionId)) {
-      log('[ChatHistory] Setting active session: $sessionId');
+    if (mounted) {
       state = state.copyWith(activeSessionId: sessionId);
-    } else {
-      log('[ChatHistory] Attempted to set non-existent session active: $sessionId');
+      log('[ChatHistory] Set active session to: $sessionId');
     }
   }
 }
-
-// --- Chat History Provider ---
-final chatHistoryProvider = StateNotifierProvider<ChatHistoryNotifier, ChatHistoryState>((ref) {
-  return ChatHistoryNotifier();
-});

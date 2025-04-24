@@ -6,17 +6,16 @@ import '../services/gemini_service.dart';
 import 'chat_history_provider.dart';
 import '../models/chat_session.dart';
 import '../utils/supabase_client.dart';
+import '../services/auth_service.dart';
 
-// Provider for GeminiService (assuming it's defined elsewhere)
-// If not, define or import GeminiService here
+// Provider for GeminiService
 final geminiServiceProvider = Provider<GeminiService>((ref) => GeminiService());
 
-// --- Single Chat Session State ---
-@immutable // Good practice for state classes
+@immutable
 class ChatState {
   final List<ChatMessage> messages;
   final bool isLoading;
-  final String sessionId; // Keep track of which session this state belongs to
+  final String sessionId;
 
   const ChatState({
     required this.sessionId,
@@ -27,18 +26,15 @@ class ChatState {
   ChatState copyWith({
     List<ChatMessage>? messages,
     bool? isLoading,
-    // sessionId should not change
   }) {
     return ChatState(
-      sessionId: sessionId, // Keep the original sessionId
+      sessionId: sessionId,
       messages: messages ?? this.messages,
       isLoading: isLoading ?? this.isLoading,
     );
   }
 }
 
-// --- Single Chat Session Notifier ---
-// Needs the session ID it's responsible for
 class ChatNotifier extends StateNotifier<ChatState> {
   final Ref ref;
   final String sessionId;
@@ -49,6 +45,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
       : _geminiService = ref.read(geminiServiceProvider),
         super(ChatState(sessionId: sessionId)) {
     _loadMessages();
+
+    // Listen to auth state changes
+    ref.listen(authStateProvider, (previous, next) {
+      next.whenData((user) {
+        if (user == null) {
+          // Clear messages when user logs out
+          _clearState();
+        } else {
+          // Reload messages when user logs in
+          _loadMessages();
+        }
+      });
+    });
+  }
+
+  void _clearState() {
+    if (mounted) {
+      state = ChatState(sessionId: sessionId);
+      _isInitialized = false;
+      log('[Chat] Cleared chat state for session: $sessionId');
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -69,6 +86,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
           .eq('user_id', user.id)
           .order('created_at');
 
+      if (!mounted) return;
+
       final messages = response.map((data) => ChatMessage(
             text: data['content'],
             isUser: data['is_user'],
@@ -76,13 +95,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
       log('[Chat] Successfully loaded ${messages.length} messages for session: $sessionId');
       
-      if (mounted) {
-        state = state.copyWith(messages: messages);
-        _isInitialized = true;
-      }
-    } catch (e, stackTrace) {
+      state = state.copyWith(messages: messages);
+      _isInitialized = true;
+    } catch (e) {
       log('[Chat] Error loading messages for session $sessionId: $e');
-      log('[Chat] Stack trace: $stackTrace');
+      _isInitialized = false;
     }
   }
 
