@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart'; // Import AuthService
-import '../theme/app_theme.dart'; // For styling
+// For styling
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

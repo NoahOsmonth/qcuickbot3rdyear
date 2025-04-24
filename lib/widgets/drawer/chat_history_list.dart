@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/chat_message.dart'; // Assuming ChatSessionHeader is here or adjust path
+// Assuming ChatSessionHeader is here or adjust path
 import '../../models/chat_session.dart'; // Import ChatSessionHeader definition
-import '../../screens/chat_screen.dart'; // For ChatSessionHeader (if needed)
+// For ChatSessionHeader (if needed)
 import '../../theme/app_theme.dart';
-import 'dart:developer'; // For log
+// For log
 import '../../providers/chat_history_provider.dart'; // Import chatHistoryProvider
 
 class ChatHistoryList extends ConsumerWidget {
