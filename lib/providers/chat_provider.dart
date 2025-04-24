@@ -135,7 +135,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       messages: [...state.messages, userMessage],
       isLoading: true,
-    );
+    );  
 
     // Save user message
     await _saveMessage(userMessage);
