@@ -81,8 +81,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     // Get the title for the AppBar from the history state
-    // Ensure orElse provides a default ChatSessionHeader
-    final activeSessionHeader = sessions.firstWhere((s) => s.id == activeSessionId, orElse: () => const ChatSessionHeader(id: '', title: 'Chat'));
+    // Ensure orElse provides a default ChatSessionHeader with all required fields
+    final activeSessionHeader = sessions.firstWhere(
+      (s) => s.id == activeSessionId,
+      orElse: () => const ChatSessionHeader(id: '', title: 'Chat', isPinned: false, isArchived: false), // Provide defaults
+    );
     final activeSessionTitle = activeSessionHeader.title;
 
 
@@ -221,11 +224,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           // Use the extracted DrawerHeaderWidget
           const DrawerHeaderWidget(),
           const Divider(height: 1, thickness: 1),
-          // Use the extracted ChatHistoryList widget
-          ChatHistoryList(
-            sessions: sessions,
-            activeSessionId: activeSessionId,
-          ),
+          // Use the extracted ChatHistoryList widget (no parameters needed)
+          const ChatHistoryList(),
           const Divider(height: 1, thickness: 1),
           // Use the extracted SettingsTile widget
           const SettingsTile(),

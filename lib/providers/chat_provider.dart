@@ -145,9 +145,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (state.messages.where((m) => m.isUser).length == 1) {
       final historyNotifier = ref.read(chatHistoryProvider.notifier);
       final historyState = ref.read(chatHistoryProvider);
+      // Check both active and archived lists for the session
       final currentSession = historyState.sessions.firstWhere(
         (s) => s.id == sessionId,
-        orElse: () => ChatSessionHeader(id: '', title: ''),
+        orElse: () => historyState.archivedSessions.firstWhere(
+          (s) => s.id == sessionId,
+          // Provide default values including the new fields
+          orElse: () => const ChatSessionHeader(id: '', title: '', isPinned: false, isArchived: false),
+        ),
       );
       if (currentSession.id.isNotEmpty && currentSession.title == 'New Chat') {
         await historyNotifier.updateSessionTitle(sessionId, text);

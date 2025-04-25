@@ -19,26 +19,30 @@ final _uuid = Uuid();
 // --- Chat History State ---
 @immutable
 class ChatHistoryState {
-  final List<ChatSessionHeader> sessions;
+  final List<ChatSessionHeader> sessions; // Includes pinned and active, excludes archived
+  final List<ChatSessionHeader> archivedSessions; // Separate list for archived
   final String? activeSessionId;
-  final bool isLoading; // Add loading state
+  final bool isLoading;
 
   const ChatHistoryState({
     this.sessions = const [],
+    this.archivedSessions = const [], // Initialize archived list
     this.activeSessionId,
-    this.isLoading = false, // Default to false
+    this.isLoading = false,
   });
 
   ChatHistoryState copyWith({
     List<ChatSessionHeader>? sessions,
+    List<ChatSessionHeader>? archivedSessions, // Add archivedSessions
     String? activeSessionId,
-    bool? isLoading, // Add isLoading
+    bool? isLoading,
     bool forceActiveNull = false,
   }) {
     return ChatHistoryState(
       sessions: sessions ?? this.sessions,
+      archivedSessions: archivedSessions ?? this.archivedSessions, // Update archivedSessions
       activeSessionId: forceActiveNull ? null : activeSessionId ?? this.activeSessionId,
-      isLoading: isLoading ?? this.isLoading, // Update isLoading
+      isLoading: isLoading ?? this.isLoading,
     );
   }
 }
@@ -46,7 +50,7 @@ class ChatHistoryState {
 class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
   final Ref ref;
   final ChatSessionService _chatService = ChatSessionService();
-  
+
   ChatHistoryNotifier(this.ref) : super(const ChatHistoryState()) {
     _initializeAuthListener();
     _loadUserChats();
@@ -70,17 +74,18 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
       state = const ChatHistoryState(); // Reset to initial state
     }
   }
+
   Future<void> _loadUserChats() async {
     if (state.isLoading) {
-       log('[ChatHistory] Already loading chats, skipping.');
-       return;
+      log('[ChatHistory] Already loading chats, skipping.');
+      return;
     }
 
     final user = supabase.auth.currentUser;
     if (user == null) {
       log('[ChatHistory] No user logged in, ensuring state is clear.');
       if (mounted) {
-         state = const ChatHistoryState();
+        state = const ChatHistoryState();
       }
       return;
     }
@@ -91,23 +96,37 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
 
     try {
       log('[ChatHistory] Loading chats for user: ${user.id}');
-      final sessions = await _chatService.loadUserChats(user.id);
+      // Service now returns chats ordered by pinned, then created_at
+      final allSessions = await _chatService.loadUserChats(user.id);
 
       if (!mounted) return;
 
-      log('[ChatHistory] Loaded ${sessions.length} chats for user ${user.id}');
+      log('[ChatHistory] Loaded ${allSessions.length} chats for user ${user.id}');
 
-      if (sessions.isNotEmpty) {
+      // Separate active/pinned from archived
+      final activeAndPinnedSessions = allSessions.where((s) => !s.isArchived).toList();
+      final archivedSessions = allSessions.where((s) => s.isArchived).toList();
+
+      if (activeAndPinnedSessions.isNotEmpty) {
         state = state.copyWith(
-          sessions: sessions,
-          activeSessionId: sessions.first.id,
+          sessions: activeAndPinnedSessions,
+          archivedSessions: archivedSessions,
+          activeSessionId: activeAndPinnedSessions.first.id, // Activate the first non-archived
           isLoading: false,
         );
-        log('[ChatHistory] Set active session to: ${sessions.first.id}');
+        log('[ChatHistory] Set active session to: ${activeAndPinnedSessions.first.id}');
       } else {
+        // If only archived chats exist or no chats exist, start a new one
         if (mounted) {
-            state = state.copyWith(isLoading: false);
-            await startNewChat(activate: true);
+          state = state.copyWith(
+            isLoading: false,
+            sessions: [], // Ensure main list is empty
+            archivedSessions: archivedSessions, // Keep archived ones
+          );
+          // Only start a new chat if there are no archived ones either
+          if (archivedSessions.isEmpty) {
+             await startNewChat(activate: true);
+          }
         }
       }
     } catch (e, stackTrace) {
@@ -115,37 +134,46 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
       log('[ChatHistory] Stack trace: $stackTrace');
       if (mounted) {
         state = state.copyWith(isLoading: false);
-        if (state.sessions.isEmpty) {
+        // Start new chat only if there are absolutely no sessions loaded (active or archived)
+        if (state.sessions.isEmpty && state.archivedSessions.isEmpty) {
           await startNewChat(activate: true);
         }
       }
     } finally {
-       if (mounted && state.isLoading) {
-          state = state.copyWith(isLoading: false);
-       }
+      if (mounted && state.isLoading) {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
+
   Future<String> startNewChat({bool activate = true}) async {
     final user = supabase.auth.currentUser;
     if (user == null) {
-       log('[ChatHistory] Cannot start new chat, no user logged in.');
-       return '';
+      log('[ChatHistory] Cannot start new chat, no user logged in.');
+      return '';
     }
-    
+
     final newSessionId = _uuid.v4();
-    final newSessionHeader = ChatSessionHeader(id: newSessionId, title: 'New Chat');
+    // Fix: Add required isPinned and isArchived
+    final newSessionHeader = ChatSessionHeader(
+      id: newSessionId,
+      title: 'New Chat',
+      isPinned: false,
+      isArchived: false,
+    );
 
     final previousState = state;
     if (mounted) {
-       final updatedSessions = [newSessionHeader, ...state.sessions];
-       state = state.copyWith(
-         sessions: updatedSessions,
-         activeSessionId: activate ? newSessionId : state.activeSessionId,
-       );
-       log('[ChatHistory] Optimistically updated local state with new chat: $newSessionId');
+      // Add to the beginning of the main sessions list
+      final updatedSessions = [newSessionHeader, ...state.sessions];
+      state = state.copyWith(
+        sessions: updatedSessions,
+        activeSessionId: activate ? newSessionId : state.activeSessionId,
+      );
+      log('[ChatHistory] Optimistically updated local state with new chat: $newSessionId');
     } else {
-        log('[ChatHistory] Not mounted, cannot start new chat.');
-        return '';
+      log('[ChatHistory] Not mounted, cannot start new chat.');
+      return '';
     }
 
     try {
@@ -155,25 +183,41 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
       log('[ChatHistory] Error creating new chat: $e');
       log('[ChatHistory] Stack trace: $stackTrace');
       if (mounted) {
-         state = previousState;
+        state = previousState; // Revert optimistic update
       }
       rethrow;
     }
   }
+
   Future<void> updateSessionTitle(String sessionId, String newTitle) async {
     final user = supabase.auth.currentUser;
+    // Check both active and archived lists
     final sessionIndex = state.sessions.indexWhere((s) => s.id == sessionId);
+    final archivedSessionIndex = state.archivedSessions.indexWhere((s) => s.id == sessionId);
 
-    if (sessionIndex != -1 && state.sessions[sessionIndex].title != newTitle) {
+    if (sessionIndex != -1 || archivedSessionIndex != -1) {
       final previousState = state;
-      final updatedSessions = List<ChatSessionHeader>.from(state.sessions);
-      updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
+      List<ChatSessionHeader> updatedSessions = List.from(state.sessions);
+      List<ChatSessionHeader> updatedArchivedSessions = List.from(state.archivedSessions);
+      bool updated = false;
 
-      if (mounted) {
-        state = state.copyWith(sessions: updatedSessions);
+      if (sessionIndex != -1 && updatedSessions[sessionIndex].title != newTitle) {
+         updatedSessions[sessionIndex] = updatedSessions[sessionIndex].copyWith(title: newTitle);
+         updated = true;
+      } else if (archivedSessionIndex != -1 && updatedArchivedSessions[archivedSessionIndex].title != newTitle) {
+         updatedArchivedSessions[archivedSessionIndex] = updatedArchivedSessions[archivedSessionIndex].copyWith(title: newTitle);
+         updated = true;
+      }
+
+
+      if (updated && mounted) {
+        state = state.copyWith(sessions: updatedSessions, archivedSessions: updatedArchivedSessions);
         log('[ChatHistory] Optimistically updated local title for session: $sessionId');
-      } else {
+      } else if (!mounted) {
          log('[ChatHistory] Not mounted, cannot update session title.');
+         return;
+      } else {
+         // Title was already the same, no need to update
          return;
       }
 
@@ -187,71 +231,219 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
         log('[ChatHistory] Error updating chat title: $e');
         log('[ChatHistory] Stack trace: $stackTrace');
         if (mounted) {
-          state = previousState;
+          state = previousState; // Revert optimistic update
         }
       }
     }
   }
+
   Future<void> deleteSession(String sessionId) async {
     final user = supabase.auth.currentUser;
     final previousState = state;
 
+    // Remove from both lists
     final updatedSessions = state.sessions.where((s) => s.id != sessionId).toList();
+    final updatedArchivedSessions = state.archivedSessions.where((s) => s.id != sessionId).toList();
+
     String? newActiveSessionId = state.activeSessionId;
     bool activeChanged = false;
 
+    // If the deleted session was active, find a new active session from the updated main list
     if (newActiveSessionId == sessionId) {
       activeChanged = true;
       if (updatedSessions.isNotEmpty) {
-        newActiveSessionId = updatedSessions.first.id;
+        newActiveSessionId = updatedSessions.first.id; // Activate the first remaining non-archived
       } else {
-        newActiveSessionId = null;
+        newActiveSessionId = null; // No active sessions left
       }
     }
 
     if (mounted) {
       state = state.copyWith(
         sessions: updatedSessions,
+        archivedSessions: updatedArchivedSessions,
         activeSessionId: newActiveSessionId,
         forceActiveNull: activeChanged && newActiveSessionId == null,
       );
       log('[ChatHistory] Optimistically deleted session locally: $sessionId');
     } else {
-       log('[ChatHistory] Not mounted, cannot delete session.');
-       return;
+      log('[ChatHistory] Not mounted, cannot delete session.');
+      return;
     }
 
     try {
       if (user != null) {
-        await _chatService.deleteChat(sessionId, user.id);
+        // Fix: Use renamed service method
+        await _chatService.deleteSession(sessionId, user.id);
       } else {
-         log('[ChatHistory] No user logged in, cannot delete from Supabase');
+        log('[ChatHistory] No user logged in, cannot delete from Supabase');
       }
 
+      // If deleting the last non-archived session, start a new one only if no archived exist
       if (mounted && state.sessions.isEmpty && state.activeSessionId == null) {
-        await startNewChat(activate: true);
+         if (state.archivedSessions.isEmpty) {
+            await startNewChat(activate: true);
+         }
       }
 
     } catch (e, stackTrace) {
       log('[ChatHistory] Error deleting chat: $e');
       log('[ChatHistory] Stack trace: $stackTrace');
       if (mounted) {
-        state = previousState;
+        state = previousState; // Revert optimistic update
       }
     }
   }
 
-   void setActiveSession(String sessionId) {
+  // --- New Methods for Pinning and Archiving ---
+
+  Future<void> pinSession(String sessionId, bool isPinned) async {
+     final user = supabase.auth.currentUser;
+     final sessionIndex = state.sessions.indexWhere((s) => s.id == sessionId);
+
+     if (sessionIndex == -1 || user == null) {
+        log('[ChatHistory] Cannot pin/unpin session $sessionId: Not found in active list or user not logged in.');
+        return;
+     }
+
+     final previousState = state;
+     final updatedSession = state.sessions[sessionIndex].copyWith(isPinned: isPinned);
+     var updatedSessions = List<ChatSessionHeader>.from(state.sessions);
+     updatedSessions[sessionIndex] = updatedSession;
+
+     // Re-sort the list: Pinned first, then by creation date (descending - assumed from load)
+     updatedSessions.sort((a, b) {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        // Keep original relative order for items with same pin status
+        return 0;
+     });
+
+
+     if (mounted) {
+        state = state.copyWith(sessions: updatedSessions);
+        log('[ChatHistory] Optimistically updated pin status for session: $sessionId');
+     } else {
+        return;
+     }
+
+     try {
+        await _chatService.updatePinStatus(sessionId, user.id, isPinned);
+     } catch (e, stackTrace) {
+        log('[ChatHistory] Error updating pin status: $e');
+        log('[ChatHistory] Stack trace: $stackTrace');
+        if (mounted) {
+           state = previousState; // Revert
+        }
+     }
+  }
+
+  Future<void> archiveSession(String sessionId, bool isArchived) async {
+     final user = supabase.auth.currentUser;
+     if (user == null) {
+        log('[ChatHistory] Cannot archive/unarchive session $sessionId: User not logged in.');
+        return;
+     }
+
+     final previousState = state;
+     List<ChatSessionHeader> updatedSessions = List.from(state.sessions);
+     List<ChatSessionHeader> updatedArchivedSessions = List.from(state.archivedSessions);
+     ChatSessionHeader? sessionToMove;
+     String? newActiveSessionId = state.activeSessionId;
+     bool activeChanged = false;
+
+     if (isArchived) {
+        // Archiving: Move from sessions to archivedSessions
+        final sessionIndex = updatedSessions.indexWhere((s) => s.id == sessionId);
+        if (sessionIndex != -1) {
+           sessionToMove = updatedSessions.removeAt(sessionIndex).copyWith(isArchived: true, isPinned: false); // Unpin when archiving
+           updatedArchivedSessions.insert(0, sessionToMove); // Add to start of archived
+
+           // If archived session was active, pick a new active one
+           if (state.activeSessionId == sessionId) {
+              activeChanged = true;
+              newActiveSessionId = updatedSessions.isNotEmpty ? updatedSessions.first.id : null;
+           }
+        } else {
+           log('[ChatHistory] Session $sessionId not found in active list for archiving.');
+           return; // Session not found or already archived
+        }
+     } else {
+        // Unarchiving: Move from archivedSessions to sessions
+        final sessionIndex = updatedArchivedSessions.indexWhere((s) => s.id == sessionId);
+        if (sessionIndex != -1) {
+           sessionToMove = updatedArchivedSessions.removeAt(sessionIndex).copyWith(isArchived: false);
+           updatedSessions.insert(0, sessionToMove); // Add to start of active (will be sorted by pin later if needed)
+           // Re-sort active sessions (pinned first)
+           updatedSessions.sort((a, b) {
+              if (a.isPinned && !b.isPinned) return -1;
+              if (!a.isPinned && b.isPinned) return 1;
+              return 0;
+           });
+           // Optionally activate the unarchived session
+           // newActiveSessionId = sessionId;
+           // activeChanged = true;
+        } else {
+           log('[ChatHistory] Session $sessionId not found in archived list for unarchiving.');
+           return; // Session not found or already active
+        }
+     }
+
+     if (mounted) {
+        state = state.copyWith(
+           sessions: updatedSessions,
+           archivedSessions: updatedArchivedSessions,
+           activeSessionId: newActiveSessionId,
+           forceActiveNull: activeChanged && newActiveSessionId == null,
+        );
+        log('[ChatHistory] Optimistically updated archive status for session: $sessionId');
+     } else {
+        return;
+     }
+
+     try {
+        // Update archive status in DB. Also update pin status if archiving (set to false).
+        await _chatService.updateArchiveStatus(sessionId, user.id, isArchived);
+        if (isArchived && sessionToMove != null && sessionToMove.isPinned) { // Check sessionToMove is not null
+           await _chatService.updatePinStatus(sessionId, user.id, false);
+        }
+
+        // Handle edge cases after DB update
+        if (mounted) {
+           // If unarchiving made the main list non-empty and no active session was set, activate the first one.
+           if (!isArchived && state.sessions.isNotEmpty && state.activeSessionId == null) {
+              state = state.copyWith(activeSessionId: state.sessions.first.id);
+           }
+           // If archiving removed the last active session, start a new one only if no archived exist.
+           else if (isArchived && state.sessions.isEmpty && state.activeSessionId == null && state.archivedSessions.isEmpty) {
+              await startNewChat(activate: true);
+           }
+        }
+
+     } catch (e, stackTrace) {
+        log('[ChatHistory] Error updating archive status: $e');
+        log('[ChatHistory] Stack trace: $stackTrace');
+        if (mounted) {
+           state = previousState; // Revert
+        }
+     }
+  }
+
+
+  // --- End New Methods ---
+
+  void setActiveSession(String sessionId) {
+    // Allow setting active only if it's in the main 'sessions' list (not archived)
     if (state.sessions.any((s) => s.id == sessionId)) {
       if (state.activeSessionId != sessionId) {
-         log('[ChatHistory] Setting active session: $sessionId');
-         if (mounted) {
-            state = state.copyWith(activeSessionId: sessionId);
-         }
+        log('[ChatHistory] Setting active session: $sessionId');
+        if (mounted) {
+          state = state.copyWith(activeSessionId: sessionId);
+        }
       }
     } else {
-      log('[ChatHistory] Attempted to set non-existent session active: $sessionId');
-      // Optionally, if the active session ID is somehow invalid, reset it
+      log('[ChatHistory] Attempted to set non-existent or archived session active: $sessionId');
+      // If the current active ID is invalid (not in sessions), reset it
       if (mounted && state.activeSessionId == sessionId) {
          state = state.copyWith(activeSessionId: state.sessions.isNotEmpty ? state.sessions.first.id : null);
       }

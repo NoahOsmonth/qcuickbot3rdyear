@@ -5,14 +5,28 @@ import 'package:flutter/foundation.dart';
 class ChatSessionHeader {
   final String id;
   final String title; // e.g., derived from the first user message
+  final bool isPinned;
+  final bool isArchived;
 
-  const ChatSessionHeader({required this.id, required this.title});
+  const ChatSessionHeader({
+    required this.id,
+    required this.title,
+    required this.isPinned,
+    required this.isArchived,
+  });
 
   // Add copyWith and equality for potential state updates
-  ChatSessionHeader copyWith({String? id, String? title}) {
+  ChatSessionHeader copyWith({
+    String? id,
+    String? title,
+    bool? isPinned,
+    bool? isArchived,
+  }) {
     return ChatSessionHeader(
       id: id ?? this.id,
       title: title ?? this.title,
+      isPinned: isPinned ?? this.isPinned,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 
@@ -22,8 +36,11 @@ class ChatSessionHeader {
       other is ChatSessionHeader &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          title == other.title;
+          title == other.title &&
+          isPinned == other.isPinned &&
+          isArchived == other.isArchived;
 
   @override
-  int get hashCode => id.hashCode ^ title.hashCode;
+  int get hashCode =>
+      id.hashCode ^ title.hashCode ^ isPinned.hashCode ^ isArchived.hashCode;
 }

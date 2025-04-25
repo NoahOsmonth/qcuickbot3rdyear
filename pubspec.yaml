@@ -38,6 +38,7 @@ dependencies:
   flutter_markdown: ^0.6.18 # Added for markdown support
   uuid: ^4.4.0 # Add uuid package
   supabase_flutter: ^2.5.0 # Add Supabase
+  speech_to_text: ^6.6.1 # Add Speech to Text
 dev_dependencies:
   flutter_test:
     sdk: flutter
