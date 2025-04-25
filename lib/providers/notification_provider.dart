@@ -16,10 +16,15 @@ final unreadNotificationCountProvider = Provider.family<int, String?>((ref, cour
   // Watch the main notification stream
   final asyncNotifications = ref.watch(notificationsProvider(courseId));
 
-  // Return the count of unread items when data is available
-  return asyncNotifications.when(
-    data: (notifications) => notifications.where((n) => !n.is_read).length,
-    loading: () => 0, // Or handle loading state differently if needed
-    error: (_, __) => 0, // Or handle error state differently if needed
+  // Calculate and log the count when data is available
+  final count = asyncNotifications.when(
+    data: (notifications) {
+      final unreadCount = notifications.where((n) => !n.is_read).length;
+      print('unreadNotificationCountProvider($courseId): Recalculated count = $unreadCount'); // Added Log
+      return unreadCount;
+    },
+    loading: () => 0,
+    error: (_, __) => 0,
   );
+  return count;
 });

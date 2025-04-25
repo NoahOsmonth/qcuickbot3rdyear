@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'theme/app_theme.dart';
 import 'screens/settings_screen.dart';
 import 'screens/chat_screen.dart';
@@ -12,7 +11,6 @@ import 'services/auth_service.dart'; // Import AuthService and providers
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  setUrlStrategy(PathUrlStrategy()); // Added to use path-based routing
   await initializeSupabase();
   runApp(const ProviderScope(child: MyApp()));
 }

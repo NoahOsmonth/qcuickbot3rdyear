@@ -7,7 +7,7 @@ import 'notification_detail_screen.dart';
 /// Screen to list real-time notifications, optionally filtered by courseId
 class NotificationScreen extends ConsumerWidget {
   final String? courseId;
-  const NotificationScreen({Key? key, this.courseId}) : super(key: key);
+  const NotificationScreen({super.key, this.courseId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

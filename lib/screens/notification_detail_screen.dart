@@ -6,7 +6,7 @@ import '../providers/notification_provider.dart'; // Import provider for service
 // Convert to ConsumerStatefulWidget
 class NotificationDetailScreen extends ConsumerStatefulWidget {
   final NotificationItem notification;
-  const NotificationDetailScreen({Key? key, required this.notification}) : super(key: key);
+  const NotificationDetailScreen({super.key, required this.notification});
 
   @override
   ConsumerState<NotificationDetailScreen> createState() => _NotificationDetailScreenState();
