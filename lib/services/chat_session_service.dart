@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer';
 import '../models/chat_session.dart';
 import '../utils/supabase_client.dart';

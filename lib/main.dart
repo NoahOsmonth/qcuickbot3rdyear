@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'theme/app_theme.dart';
 import 'screens/settings_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/login_screen.dart'; // Import Login Screen
 import 'screens/signup_screen.dart'; // Import SignUp Screen
+import 'screens/notification_screen.dart'; // Import Notification Screen
 import 'utils/supabase_client.dart'; // Import Supabase client
 import 'services/auth_service.dart'; // Import AuthService and providers
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  setUrlStrategy(PathUrlStrategy()); // Added to use path-based routing
   await initializeSupabase();
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -36,6 +39,7 @@ class MyApp extends ConsumerWidget { // Change to ConsumerWidget
         '/login': (context) => const LoginScreen(), // Add login route
         '/signup': (context) => const SignUpScreen(), // Add signup route
         '/chat': (context) => const ChatScreen(), // Optional: explicit chat route
+        '/notifications': (context) => const NotificationScreen(),
         // Add other routes as needed
       },
     );

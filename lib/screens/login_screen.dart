@@ -36,7 +36,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _emailController.text.trim(),
               _passwordController.text.trim(),
             );
-        // Navigation will be handled by the auth state listener in main.dart
+            Navigator.pushNamedAndRemoveUntil(context, '/chat', (route) => false);
+        // Navigates to chat screen after successful login
       } catch (e) {
         setState(() {
           _errorMessage = 'Failed to sign in: ${e.toString()}';

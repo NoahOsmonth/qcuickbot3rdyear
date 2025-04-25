@@ -12,6 +12,7 @@ import '../widgets/drawer/settings_tile.dart';
 import '../providers/chat_provider.dart'; // Import chat provider
 import '../providers/chat_history_provider.dart'; // Import history provider
 import '../models/chat_session.dart'; // Import session header model
+import '../widgets/notification_icon_button.dart';
 
 // Keep Gemini Service Provider here or move to a dedicated services/providers file
 final geminiServiceProvider = Provider<GeminiService>((ref) => GeminiService());
@@ -95,6 +96,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         elevation: 0,
         actions: [
+          const NotificationIconButton(),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.white),
             tooltip: 'New Chat',

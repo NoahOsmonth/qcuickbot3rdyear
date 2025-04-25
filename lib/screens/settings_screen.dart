@@ -30,7 +30,7 @@ class SettingsScreen extends ConsumerWidget { // Change to ConsumerWidget
                 onPressed: () async {
                   try {
                     await ref.read(authServiceProvider).signOut();
-                    // Navigation should be handled by the auth state listener
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false); // Clear stack and navigate to login
                   } catch (e) {
                     // Optionally show an error message
                     ScaffoldMessenger.of(context).showSnackBar(
