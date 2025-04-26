@@ -99,7 +99,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         elevation: 0,
         actions: [
-          const NotificationIconButton(),
+          NotificationIconButton(),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.white),
             tooltip: 'New Chat',

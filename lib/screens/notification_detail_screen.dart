@@ -27,6 +27,8 @@ class _NotificationDetailScreenState extends ConsumerState<NotificationDetailScr
       try {
         // Access the service via ref and call the markAsRead method
         await ref.read(notificationServiceProvider).markNotificationAsRead(widget.notification.id);
+        // Invalidate the notifications stream provider to trigger immediate refresh
+        ref.invalidate(notificationsProvider(widget.notification.courseId));
         // Optional: Add feedback or error handling here
       } catch (e) {
         // Handle potential errors during the update

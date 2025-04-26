@@ -84,7 +84,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
           .select()
           .eq('session_id', sessionId)
           .eq('user_id', user.id)
-          .order('created_at');
+          .order('created_at', ascending: true);
 
       if (!mounted) return;
 
