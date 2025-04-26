@@ -1,9 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/notification_model.dart';
 import '../services/notification_service.dart';
 
 /// Provides NotificationService instance
 final notificationServiceProvider = Provider((ref) => NotificationService());
+
+/// Provider for requesting notification permissions
+final notificationPermissionProvider = FutureProvider<NotificationSettings>((ref) async {
+  final messaging = FirebaseMessaging.instance;
+  final settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+  print('User granted permission: ${settings.authorizationStatus}');
+  return settings;
+});
 
 /// Stream of notifications, optionally filtered by courseId
 final notificationsProvider = StreamProvider.family<List<NotificationItem>, String?>((ref, courseId) {

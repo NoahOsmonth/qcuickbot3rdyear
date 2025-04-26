@@ -21,7 +21,7 @@ class AppColors {
   static const Color bubbleText = Color(0xFFE5E5E5); // light text for bubbles
 
   // Accent
-  static const Color accentYellow = Color(0xFFFFC940);
+  static const Color accentYellow = Color.fromARGB(255, 115, 168, 228);
   static const Color accentRed = Color(0xFFFF5A5F);
   static const Color accentBlue = Color.fromARGB(255, 46, 67, 114);
 

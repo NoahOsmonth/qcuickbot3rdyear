@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/chat_session.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/chat_history_provider.dart';
-import 'dart:developer'; // Keep for log if needed
+// Keep for log if needed
 
 class ChatHistoryList extends ConsumerWidget {
   // Removed sessions and activeSessionId from constructor, get from provider

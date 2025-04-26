@@ -404,7 +404,7 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
      try {
         // Update archive status in DB. Also update pin status if archiving (set to false).
         await _chatService.updateArchiveStatus(sessionId, user.id, isArchived);
-        if (isArchived && sessionToMove != null && sessionToMove.isPinned) { // Check sessionToMove is not null
+        if (isArchived && sessionToMove.isPinned) { // Check sessionToMove is not null
            await _chatService.updatePinStatus(sessionId, user.id, false);
         }
 

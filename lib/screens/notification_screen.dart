@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/notification_provider.dart';
-import '../models/notification_model.dart';
 import 'notification_detail_screen.dart';
 
 /// Screen to list real-time notifications, optionally filtered by courseId
