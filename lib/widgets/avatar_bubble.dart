@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
-import '../theme/app_theme.dart';
+// Removed direct import of AppColors, will use Theme.of(context)
 
 class AvatarBubble extends StatelessWidget {
   final ChatMessage message;
@@ -15,6 +15,7 @@ class AvatarBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context); // Get the current theme
     // Determine properties based on the message object
     final bool isUser = message.isUser; // Use the boolean field directly
     final String text = message.text;
@@ -22,8 +23,13 @@ class AvatarBubble extends StatelessWidget {
     final bool isButton = message.type == MessageType.quickReplies; // Correctly check for button type
     final VoidCallback? onTap = null; // Placeholder for potential button tap logic
 
-    final bubbleColor = isUser ? AppColors.userBubble : AppColors.botBubble;
-    final textColor = AppColors.bubbleText;
+    // Determine colors based on theme and user type
+    final bubbleColor = isUser
+        ? theme.colorScheme.primaryContainer // User bubble color from theme
+        : theme.cardColor; // Bot bubble color from theme (use cardColor for consistency)
+    final textColor = isUser
+        ? theme.colorScheme.onPrimaryContainer // Text color for user bubble
+        : theme.textTheme.bodyLarge?.color; // Text color for bot bubble (use theme's text color)
     final borderRadius = isUser
         ? BorderRadius.only(
             topLeft: Radius.circular(16),
@@ -36,17 +42,20 @@ class AvatarBubble extends StatelessWidget {
             bottomRight: Radius.circular(16),
           );
     final avatar = avatarUrl != null
-        ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl), radius: 18, backgroundColor: AppColors.sidebar)
-        : CircleAvatar(radius: 18, backgroundColor: AppColors.sidebarCard, child: Icon(isUser ? Icons.person : Icons.android, color: AppColors.accentBlue));
+        ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl), radius: 24, backgroundColor: theme.colorScheme.surfaceVariant)
+        : isUser
+            ? CircleAvatar(radius: 24, backgroundColor: theme.cardColor, child: Icon(Icons.person, color: theme.colorScheme.primary))
+            : CircleAvatar(backgroundImage: AssetImage('assets/pictures/chatbotprofile.png'), radius: 24, backgroundColor: theme.colorScheme.surfaceVariant);
     
     final Widget bubbleContent;
     if (isThinking) {
-      bubbleContent = const SizedBox(
+      // Remove const here because theme.colorScheme.primary is not constant
+      bubbleContent = SizedBox(
         height: 20,
         width: 40,
-        child: LinearProgressIndicator( 
+        child: LinearProgressIndicator(
           backgroundColor: Colors.transparent,
-          valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 64, 140, 255)),
+          valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary), // Use theme color
         ),
       );
     } else if (!isUser) {
@@ -54,13 +63,13 @@ class AvatarBubble extends StatelessWidget {
       bubbleContent = MarkdownBody(
         data: text,
         styleSheet: MarkdownStyleSheet(
-          p: TextStyle(color: textColor, fontSize: 16),
+          p: TextStyle(color: textColor ?? theme.textTheme.bodyLarge?.color, fontSize: 16), // Use theme text color with fallback
         ),
       );
     } else {
       bubbleContent = Text(
         text,
-        style: TextStyle(color: textColor, fontSize: 16),
+        style: TextStyle(color: textColor ?? theme.textTheme.bodyLarge?.color, fontSize: 16), // Use theme text color with fallback
       );
     }
 
@@ -70,7 +79,8 @@ class AvatarBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: bubbleColor,
         borderRadius: borderRadius,
-        border: Border.all(color: AppColors.sidebarCard),
+        // Use theme divider color for border, or remove if not desired
+        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
       ),
       child: bubbleContent,
     );

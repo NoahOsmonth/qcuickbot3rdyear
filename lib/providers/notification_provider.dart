@@ -7,7 +7,9 @@ import '../services/notification_service.dart';
 final notificationServiceProvider = Provider((ref) => NotificationService());
 
 /// Provider for requesting notification permissions
-final notificationPermissionProvider = FutureProvider<NotificationSettings>((ref) async {
+final notificationPermissionProvider = FutureProvider<NotificationSettings>((
+  ref,
+) async {
   final messaging = FirebaseMessaging.instance;
   final settings = await messaging.requestPermission(
     alert: true,
@@ -19,13 +21,17 @@ final notificationPermissionProvider = FutureProvider<NotificationSettings>((ref
 });
 
 /// Stream of notifications, optionally filtered by courseId
-final notificationsProvider = StreamProvider.family<List<NotificationItem>, String?>((ref, courseId) {
-  final service = ref.watch(notificationServiceProvider);
-  return service.subscribeNotifications(courseId: courseId);
-});
+final notificationsProvider =
+    StreamProvider.family<List<NotificationItem>, String?>((ref, courseId) {
+      final service = ref.watch(notificationServiceProvider);
+      return service.subscribeNotifications(courseId: courseId);
+    });
 
 /// Provides the count of unread notifications, optionally filtered by courseId.
-final unreadNotificationCountProvider = Provider.family<int, String?>((ref, courseId) {
+final unreadNotificationCountProvider = Provider.family<int, String?>((
+  ref,
+  courseId,
+) {
   // Watch the main notification stream
   final asyncNotifications = ref.watch(notificationsProvider(courseId));
 
@@ -33,7 +39,9 @@ final unreadNotificationCountProvider = Provider.family<int, String?>((ref, cour
   final count = asyncNotifications.when(
     data: (notifications) {
       final unreadCount = notifications.where((n) => !n.is_read).length;
-      print('unreadNotificationCountProvider($courseId): Recalculated count = $unreadCount'); // Added Log
+      print(
+        'unreadNotificationCountProvider($courseId): Recalculated count = $unreadCount',
+      ); // Added Log
       return unreadCount;
     },
     loading: () => 0,

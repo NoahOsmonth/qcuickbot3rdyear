@@ -28,6 +28,25 @@ class AppColors {
   // Removed gradients: using only plain bubble colors now.
   static const Color backgroundStart = sidebar;
   static const Color backgroundEnd = mainBackground;
+
+  // --- Light Theme Colors ---
+  static const Color lightSidebar = Color(0xFFF0F2F5);
+  static const Color lightSidebarCard = Color(0xFFFFFFFF);
+  static const Color lightSidebarCardActive = Color(0xFFE5E9F0);
+  static const Color lightSidebarText = Color(0xFF333333);
+  static const Color lightSidebarAccent = Color(0xFFD8DEE9);
+
+  static const Color lightMainBackground = Color(0xFFE5E9F0);
+  static const Color lightWelcomeText = Color(0xFF2E3440);
+  static const Color lightWelcomeSubText = Color(0xFF4C566A);
+
+  static const Color lightUserBubble = Color(0xFFD8DEE9);
+  static const Color lightBotBubble = Color(0xFFFFFFFF);
+  static const Color lightBubbleText = Color(0xFF2E3440);
+
+  static const Color lightAccentYellow = Color.fromARGB(255, 64, 140, 255); // Example: Using a blue for light theme accent
+  static const Color lightAccentRed = Color(0xFFBF616A);
+  static const Color lightAccentBlue = Color(0xFF5E81AC);
 }
 
 class AppTheme {
@@ -64,7 +83,64 @@ class AppTheme {
   }
 
   static ThemeData get lightTheme {
-    // For now, use darkTheme for both for consistency with screenshot
-    return darkTheme;
+    // Define light theme based on new colors
+    return ThemeData(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: AppColors.lightMainBackground,
+      primaryColor: AppColors.lightAccentBlue, // Use a light theme primary color
+      primarySwatch: Colors.blue, // Provide a swatch for Material components
+      cardColor: AppColors.lightSidebarCard,
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.lightSidebar, // Light app bar
+        elevation: 1, // Add slight elevation for light theme
+        iconTheme: IconThemeData(color: AppColors.lightAccentBlue), // Use a suitable icon color
+        titleTextStyle: TextStyle(
+          color: AppColors.lightSidebarText, // Darker text for light app bar
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.lightUserBubble, // Light input background
+        hintStyle: TextStyle(color: Colors.grey[600]),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide(color: AppColors.lightSidebarAccent), // Add a subtle border
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide(color: AppColors.lightSidebarAccent),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide(color: AppColors.lightAccentBlue, width: 2.0), // Highlight focus
+        ),
+      ),
+      iconTheme: IconThemeData(color: AppColors.lightAccentBlue), // Default icon color
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppColors.lightAccentBlue,
+      ),
+      // Define text themes if needed for better contrast
+      textTheme: const TextTheme(
+         bodyLarge: TextStyle(color: AppColors.lightSidebarText),
+         bodyMedium: TextStyle(color: AppColors.lightSidebarText),
+         // Add other text styles as needed
+      ),
+      // Define button themes if needed
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.lightAccentBlue, // Button background
+          foregroundColor: Colors.white, // Button text color
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: AppColors.lightAccentBlue, // Color for icons in ListTiles
+      ),
+      drawerTheme: DrawerThemeData(
+        backgroundColor: AppColors.lightSidebar, // Drawer background
+      ),
+      // Add other theme properties as needed
+    );
   }
 }

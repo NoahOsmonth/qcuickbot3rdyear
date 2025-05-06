@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/chat_session.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/chat_history_provider.dart';
 // Keep for log if needed
 
-class ChatHistoryList extends ConsumerWidget {
-  // Removed sessions and activeSessionId from constructor, get from provider
+// Convert to ConsumerStatefulWidget to manage local state for pagination
+class ChatHistoryList extends ConsumerStatefulWidget {
   const ChatHistoryList({super.key});
 
-  // --- Rename Dialog --- (Keep as is)
-  Future<void> _showRenameDialog(BuildContext context, WidgetRef ref, ChatSessionHeader session) async {
+  @override
+  ConsumerState<ChatHistoryList> createState() => _ChatHistoryListState();
+}
+
+class _ChatHistoryListState extends ConsumerState<ChatHistoryList> {
+  // State variable to control how many items are displayed initially
+  int _displayCount = 7; // Show initial 7 items
+  final int _increment = 7; // Load 7 more items at a time
+
+  // --- Rename Dialog --- (Keep as is, but context/ref access changes slightly)
+  Future<void> _showRenameDialog(ChatSessionHeader session) async {
+    // Access context and ref from the State
     final textController = TextEditingController(text: session.title);
     final formKey = GlobalKey<FormState>();
 
     return showDialog<void>(
-      context: context,
+      context: context, // Use state's context
       barrierDismissible: true,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
@@ -47,6 +58,7 @@ class ChatHistoryList extends ConsumerWidget {
                 if (formKey.currentState!.validate()) {
                   final newTitle = textController.text.trim();
                   if (newTitle.isNotEmpty && newTitle != session.title) {
+                    // Use state's ref
                     ref.read(chatHistoryProvider.notifier).updateSessionTitle(session.id, newTitle);
                   }
                   Navigator.of(dialogContext).pop();
@@ -60,9 +72,10 @@ class ChatHistoryList extends ConsumerWidget {
   }
 
   // --- Delete Confirmation Dialog --- (Keep as is)
-  Future<void> _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, ChatSessionHeader session) async {
+  Future<void> _showDeleteConfirmationDialog(ChatSessionHeader session) async {
+    // Access context and ref from the State
     return showDialog<void>(
-      context: context,
+      context: context, // Use state's context
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
@@ -79,6 +92,7 @@ class ChatHistoryList extends ConsumerWidget {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),
               onPressed: () {
+                // Use state's ref
                 ref.read(chatHistoryProvider.notifier).deleteSession(session.id);
                 Navigator.of(dialogContext).pop();
               },
@@ -89,9 +103,10 @@ class ChatHistoryList extends ConsumerWidget {
     );
   }
 
-  // --- Build List Item --- Helper function for consistency
-  Widget _buildSessionTile(BuildContext context, WidgetRef ref, ChatSessionHeader session, bool isActive, bool isArchived) {
-     final historyNotifier = ref.read(chatHistoryProvider.notifier);
+  // --- Build List Item --- Helper function for consistency (Keep as is)
+  // Helper function now uses state's context and ref implicitly
+  Widget _buildSessionTile(ChatSessionHeader session, bool isActive, bool isArchived) {
+     final historyNotifier = ref.read(chatHistoryProvider.notifier); // Use state's ref
 
      return ListTile(
         leading: Icon(
@@ -145,11 +160,11 @@ class ChatHistoryList extends ConsumerWidget {
                 break;
               case 'rename':
                  Navigator.pop(context); // Close drawer for dialog
-                _showRenameDialog(context, ref, session);
-                break;
-              case 'delete':
-                 Navigator.pop(context); // Close drawer for dialog
-                _showDeleteConfirmationDialog(context, ref, session);
+                _showRenameDialog(session); // Pass only session
+               break;
+             case 'delete':
+                Navigator.pop(context); // Close drawer for dialog
+                _showDeleteConfirmationDialog(session); // Pass only session
                 break;
             }
           },
@@ -183,55 +198,107 @@ class ChatHistoryList extends ConsumerWidget {
 
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Get state directly from the provider
+  @override
+  Widget build(BuildContext context) { // ref is now accessed via `this.ref`
+    // Get state directly from the provider using the state's ref
     final historyState = ref.watch(chatHistoryProvider);
     final sessions = historyState.sessions; // Pinned and Active chats
     final archivedSessions = historyState.archivedSessions;
     final activeSessionId = historyState.activeSessionId;
+    final bool hasArchived = archivedSessions.isNotEmpty;
+
+    // Calculate total item count for the single ListView
+    int totalItemCount = sessions.length;
+    if (hasArchived) {
+      totalItemCount += 1; // Divider
+      totalItemCount += 1; // Header
+      totalItemCount += archivedSessions.length; // Archived items
+    }
+
+    // Determine the number of items to actually build in the ListView
+    final bool hasMoreItems = totalItemCount > _displayCount;
+    // If there are more items, add 1 to itemCount for the "Show More" button
+    final int listViewItemCount = hasMoreItems ? _displayCount + 1 : totalItemCount;
 
     return Expanded(
-      child: ListView( // Use a single ListView to contain both sections
-        padding: EdgeInsets.zero,
-        children: [
-          // --- Active and Pinned Chats ---
-          ListView.builder(
-            shrinkWrap: true, // Important inside another ListView
-            physics: const NeverScrollableScrollPhysics(), // Disable scrolling for this inner list
-            itemCount: sessions.length,
-            itemBuilder: (context, index) {
-              // Provider now sorts pinned first
-              final session = sessions[index];
-              final isActive = session.id == activeSessionId;
-              return _buildSessionTile(context, ref, session, isActive, false); // isArchived = false
-            },
-          ),
+      child: ListView.builder(
+        padding: EdgeInsets.zero, // Keep padding zero
+        itemCount: listViewItemCount, // Use the calculated count
+        itemBuilder: (context, index) {
 
-          // --- Archived Chats Section ---
-          if (archivedSessions.isNotEmpty) ...[
-            const Divider(height: 1, thickness: 1),
-            ExpansionTile(
+          // --- Handle "Show More" Button ---
+          if (hasMoreItems && index == _displayCount) {
+            return TextButton(
+              child: const Text('Show More'),
+              onPressed: () {
+                setState(() {
+                  // Increase display count, ensuring not to exceed total
+                  _displayCount = (_displayCount + _increment).clamp(0, totalItemCount);
+                });
+              },
+            );
+          }
+
+          // --- Render List Items (Sessions, Divider, Header) ---
+          // Calculate item index boundaries (same as before)
+          final int activeCount = sessions.length;
+          // Indices only relevant if archived sessions exist
+          final int dividerIndex = hasArchived ? activeCount : -1;
+          final int headerIndex = hasArchived ? activeCount + 1 : -1;
+          final int archivedStartIndex = hasArchived ? activeCount + 2 : -1;
+
+          // --- Render Active/Pinned Sessions ---
+          if (index < activeCount) {
+            final session = sessions[index];
+            final isActive = session.id == activeSessionId;
+            // Pass isArchived: false
+            // Call helper without context/ref args
+            return _buildSessionTile(session, isActive, false);
+          }
+          // --- Render Divider (if needed) ---
+          else if (hasArchived && index == dividerIndex) {
+            return const Divider(height: 1, thickness: 1);
+          }
+          // --- Render Archived Header (if needed) ---
+          else if (hasArchived && index == headerIndex) {
+            // Replace ExpansionTile with simple ListTile for header
+            return ListTile(
               title: Text(
                 'Archived Chats (${archivedSessions.length})',
-                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500), // Slightly bolder header
               ),
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
-              childrenPadding: EdgeInsets.zero,
-              children: [
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: archivedSessions.length,
-                  itemBuilder: (context, index) {
-                    final session = archivedSessions[index];
-                    // Archived chats cannot be active
-                    return _buildSessionTile(context, ref, session, false, true); // isArchived = true
-                  },
-                ),
-              ],
-            ),
-          ],
-        ],
+              dense: true, // Make header less tall
+              visualDensity: VisualDensity.compact,
+              // Optional: Add horizontal padding to match original ExpansionTile padding
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0),
+            );
+          }
+          // --- Render Archived Sessions (if needed) ---
+          else if (hasArchived && index >= archivedStartIndex) {
+            // Calculate the index within the archivedSessions list
+            final archivedItemIndex = index - archivedStartIndex;
+             // Add a bounds check for safety
+            if (archivedItemIndex >= 0 && archivedItemIndex < archivedSessions.length) {
+              final session = archivedSessions[archivedItemIndex];
+              // Archived sessions are never 'active' in the main view sense
+              // Pass isArchived: true
+              // Call helper without context/ref args
+              return _buildSessionTile(session, false, true);
+            } else {
+               // Log error or return empty space if index is out of bounds
+               print("Error: Archived index out of bounds: $index");
+               return const SizedBox.shrink();
+            }
+          }
+          // --- Fallback (should not be reached with correct itemCount) ---
+          else {
+            print("Error: Unexpected index in ChatHistoryList builder: $index");
+            return const SizedBox.shrink();
+          }
+        },
       ),
     );
   }

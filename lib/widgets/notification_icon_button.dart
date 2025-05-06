@@ -17,7 +17,7 @@ class NotificationIconButton extends ConsumerWidget {
       icon: Stack(
         clipBehavior: Clip.none,
             children: [
-              const Icon(Icons.notifications, color: Colors.white),
+              const Icon(Icons.notifications), // Inherit color from AppBarTheme
               if (count > 0)
                 Positioned(
                   right: -2,
