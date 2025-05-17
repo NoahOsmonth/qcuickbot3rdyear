@@ -1,47 +1,59 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
-import '../services/auth_service.dart'; // Import AuthService
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart'; // Import the theme provider
 
-class SettingsScreen extends ConsumerWidget { // Change to ConsumerWidget
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) { // Add WidgetRef
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeProvider); // Watch the current theme mode
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Settings',
-          style: TextStyle(color: const Color.fromARGB(255, 64, 140, 255)),
+          // Style adjustments might be needed based on theme
+          // style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
         ),
+        // Ensure AppBar background adapts to theme
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        iconTheme: Theme.of(context).appBarTheme.iconTheme, // Ensure back button color adapts
       ),
       body: Container(
-        color: AppColors.mainBackground,
-        child: Center(
-          child: Column( // Use Column for multiple widgets
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Settings Page',
-                style: TextStyle(fontSize: 18, color: const Color.fromARGB(255, 64, 140, 255)),
+        // Use scaffold background color which adapts to the theme
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: ListView( // Use ListView for potentially more settings
+          children: [
+            SwitchListTile(
+              title: const Text('Dark Mode'),
+              secondary: Icon(
+                themeMode == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
               ),
-              const SizedBox(height: 30), // Add some spacing
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    await ref.read(authServiceProvider).signOut();
-                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false); // Clear stack and navigate to login
-                  } catch (e) {
-                    // Optionally show an error message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Logout failed: ${e.toString()}')),
+              value: themeMode == ThemeMode.dark,
+              onChanged: (isDark) {
+                ref.read(themeProvider.notifier).setTheme(
+                      isDark ? ThemeMode.dark : ThemeMode.light,
                     );
-                  }
-                },
-                child: const Text('Log Out'),
-              ),
-            ],
-          ),
+              },
+              // Adapt colors based on theme if needed, though defaults often work
+              // activeColor: Theme.of(context).colorScheme.primary,
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () async {
+                await ref.read(authServiceProvider).signOut();
+                // Navigate back to login or handle post-logout state
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              iconColor: Theme.of(context).iconTheme.color,
+              textColor: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+            // Add other settings tiles here
+          ],
         ),
       ),
     );

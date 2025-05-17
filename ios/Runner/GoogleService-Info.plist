@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyDqbOcvREQ-3nrmugarIHd-rYAZA6lRf6c</string>
+	<key>GCM_SENDER_ID</key>
+	<string>45209853406</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.qcuickbot</string>
+	<key>PROJECT_ID</key>
+	<string>our-project-quickbot-e3c2f</string>
+	<key>STORAGE_BUCKET</key>
+	<string>our-project-quickbot-e3c2f.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:45209853406:ios:00f8c5eda58f652144d14f</string>
+</dict>
+</plist>

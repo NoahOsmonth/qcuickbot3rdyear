@@ -43,8 +43,10 @@ class NotificationService {
         schema: 'public',
         table: 'notifications',
         callback: (payload) {
+          print('NotificationService: Received UPDATE event. Payload: ${payload.newRecord}'); // Add log
           // Refetch notifications on update
           _fetchNotifications(userId, courseId).then((notifications) {
+             print('NotificationService: Refetched after UPDATE. Count: ${notifications.length}, Unread: ${notifications.where((n) => !n.is_read).length}'); // Add log with unread count
             if (!controller.isClosed) {
               controller.add(notifications);
             }

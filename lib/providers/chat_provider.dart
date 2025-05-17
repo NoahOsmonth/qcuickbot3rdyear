@@ -69,37 +69,66 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   Future<void> _loadMessages() async {
-    if (_isInitialized) return;
+    log('[ChatNotifier $sessionId] _loadMessages called. _isInitialized: $_isInitialized'); // <-- ADDED LOG
+    if (_isInitialized) {
+       log('[ChatNotifier $sessionId] Already initialized, skipping load.'); // <-- ADDED LOG
+       return;
+    }
 
     final user = supabase.auth.currentUser;
     if (user == null) {
-      log('[Chat] No user logged in, skipping message loading for session: $sessionId');
+      log('[ChatNotifier $sessionId] No user logged in, skipping message loading.'); // <-- UPDATED LOG
       return;
     }
+    log('[ChatNotifier $sessionId] User found: ${user.id}. Proceeding to load messages.'); // <-- ADDED LOG
+
+    // Set loading state immediately before the async call
+    if (mounted) {
+        // Avoid setting isLoading if messages already exist? Maybe not necessary.
+        // Let's keep it simple for now.
+        // state = state.copyWith(isLoading: true); // Let's NOT set loading here, rely on history provider? No, chat screen uses this. Set it.
+        // Correction: The ChatScreen *does* use this isLoading. We need it.
+        // But maybe only set it if messages are empty?
+        // Let's set it unconditionally for now to see the flow.
+        state = state.copyWith(isLoading: true);
+        log('[ChatNotifier $sessionId] Set isLoading = true');
+    }
+
 
     try {
-      log('[Chat] Starting to load messages for session: $sessionId');
+      log('[ChatNotifier $sessionId] Starting Supabase query for messages.'); // <-- UPDATED LOG
       final response = await supabase
           .from('chat_messages')
           .select()
           .eq('session_id', sessionId)
           .eq('user_id', user.id)
-          .order('created_at');
+          .order('created_at', ascending: true);
 
-      if (!mounted) return;
+      log('[ChatNotifier $sessionId] Supabase query completed.'); // <-- ADDED LOG
+
+      if (!mounted) {
+         log('[ChatNotifier $sessionId] Not mounted after query, returning.'); // <-- ADDED LOG
+         return;
+      }
 
       final messages = response.map((data) => ChatMessage(
             text: data['content'],
             isUser: data['is_user'],
           )).toList();
 
-      log('[Chat] Successfully loaded ${messages.length} messages for session: $sessionId');
-      
-      state = state.copyWith(messages: messages);
+      log('[ChatNotifier $sessionId] Successfully loaded ${messages.length} messages.'); // <-- UPDATED LOG
+
+      state = state.copyWith(messages: messages, isLoading: false); // Set isLoading false on success
       _isInitialized = true;
-    } catch (e) {
-      log('[Chat] Error loading messages for session $sessionId: $e');
-      _isInitialized = false;
+      log('[ChatNotifier $sessionId] State updated with messages. isLoading: false, _isInitialized: true'); // <-- ADDED LOG
+    } catch (e, stackTrace) { // <-- ADDED stackTrace
+      log('[ChatNotifier $sessionId] Error loading messages: $e'); // <-- UPDATED LOG
+      log('[ChatNotifier $sessionId] Stack trace: $stackTrace'); // <-- ADDED LOG
+      if (mounted) {
+          state = state.copyWith(isLoading: false); // Set isLoading false on error too
+          log('[ChatNotifier $sessionId] State updated after error. isLoading: false'); // <-- ADDED LOG
+      }
+      _isInitialized = false; // Keep false on error? Or set true to prevent retries? Let's keep false for now.
     }
   }
 
@@ -131,67 +160,82 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final userMessage = ChatMessage(text: text, isUser: true);
 
-    // Update state with user message
+    // Update state optimistically and set loading true
     state = state.copyWith(
       messages: [...state.messages, userMessage],
       isLoading: true,
-    );  
-
-    // Save user message
-    await _saveMessage(userMessage);
-    log('[Chat] User message sent and saved in session: $sessionId');
-
-    // Update session title if it's the first user message
-    if (state.messages.where((m) => m.isUser).length == 1) {
-      final historyNotifier = ref.read(chatHistoryProvider.notifier);
-      final historyState = ref.read(chatHistoryProvider);
-      // Check both active and archived lists for the session
-      final currentSession = historyState.sessions.firstWhere(
-        (s) => s.id == sessionId,
-        orElse: () => historyState.archivedSessions.firstWhere(
-          (s) => s.id == sessionId,
-          // Provide default values including the new fields
-          orElse: () => const ChatSessionHeader(id: '', title: '', isPinned: false, isArchived: false),
-        ),
-      );
-      if (currentSession.id.isNotEmpty && currentSession.title == 'New Chat') {
-        await historyNotifier.updateSessionTitle(sessionId, text);
-        log('[Chat] Updated session title for first message: $sessionId');
-      }
-    }
+    );
+    log('[ChatNotifier $sessionId] User message added optimistically. isLoading: true');
 
     try {
-      final responseText = await _geminiService.sendMessage(state.messages, text);
-      final botMessage = ChatMessage(text: responseText, isUser: false);
+      // Save user message
+      await _saveMessage(userMessage);
+      log('[ChatNotifier $sessionId] User message saved.');
 
-      // Update state with bot message
-      if (mounted) {
-        state = state.copyWith(
-          messages: [...state.messages, botMessage],
-          isLoading: false,
+      // Update session title if it's the first user message
+      if (state.messages.where((m) => m.isUser).length == 1) {
+        final historyNotifier = ref.read(chatHistoryProvider.notifier);
+        final historyState = ref.read(chatHistoryProvider);
+        final currentSession = historyState.sessions.firstWhere(
+          (s) => s.id == sessionId,
+          orElse: () => historyState.archivedSessions.firstWhere(
+            (s) => s.id == sessionId,
+            orElse: () => const ChatSessionHeader(id: '', title: '', isPinned: false, isArchived: false),
+          ),
         );
+        if (currentSession.id.isNotEmpty && currentSession.title == 'New Chat') {
+          await historyNotifier.updateSessionTitle(sessionId, text);
+          log('[Chat] Updated session title for first message: $sessionId');
+        }
       }
 
-      // Save bot message
-      await _saveMessage(botMessage);
-      log('[Chat] Bot response saved in session: $sessionId');
-    } catch (e, stackTrace) {
-      log('[Chat] Error in session $sessionId: $e');
-      log('[Chat] Stack trace: $stackTrace');
-      
-      final errorMessage = ChatMessage(
-        text: 'Error: Could not get response.',
-        isUser: false,
-      );
-      
-      if (mounted) {
-        state = state.copyWith(
-          messages: [...state.messages, errorMessage],
-          isLoading: false,
+      // --- Call Gemini Service ---
+      try {
+        log('[ChatNotifier $sessionId] Calling Gemini service.');
+        final responseText = await _geminiService.sendMessage(text);
+        final botMessage = ChatMessage(text: responseText, isUser: false);
+        log('[ChatNotifier $sessionId] Gemini response received.');
+
+        // Update state with bot message (isLoading will be set false in finally)
+        if (mounted) {
+          state = state.copyWith(
+            messages: [...state.messages, botMessage],
+            // isLoading: false, // Moved to finally
+          );
+          log('[ChatNotifier $sessionId] Bot message added.');
+        }
+
+        // Save bot message
+        await _saveMessage(botMessage);
+        log('[ChatNotifier $sessionId] Bot response saved.');
+
+      } catch (e, stackTrace) {
+        log('[ChatNotifier $sessionId] Error getting/saving bot response: $e');
+        log('[ChatNotifier $sessionId] Stack trace: $stackTrace');
+
+        final errorMessage = ChatMessage(
+          text: 'Error: Could not get response.',
+          isUser: false,
         );
+
+        // Update state with error message (isLoading will be set false in finally)
+        if (mounted) {
+          state = state.copyWith(
+            messages: [...state.messages, errorMessage],
+            // isLoading: false, // Moved to finally
+          );
+          log('[ChatNotifier $sessionId] Error message added.');
+        }
+        await _saveMessage(errorMessage); // Save the error message
       }
-      
-      await _saveMessage(errorMessage);
+      // --- End Gemini Service Call ---
+
+    } finally {
+      // Ensure isLoading is always set to false after processing
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+        log('[ChatNotifier $sessionId] Final state update. isLoading: false');
+      }
     }
   }
 }

@@ -51,170 +51,177 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get active session ID and the list of all sessions
-    final historyState = ref.watch(chatHistoryProvider);
-    final activeSessionId = historyState.activeSessionId;
-    final sessions = historyState.sessions;
+    // 1. Optimize watch: Select only the activeSessionId for rebuilds
+    final activeSessionId = ref.watch(chatHistoryProvider.select((s) => s.activeSessionId));
+    // Still need the full sessions list for AppBar title lookup, watch separately.
+    final sessions = ref.watch(chatHistoryProvider).sessions;
 
-    log('Building ChatScreen. Active session: $activeSessionId');
+    log('Building ChatScreen. History Active session ID: $activeSessionId');
 
-    // If there's no active session (e.g., during init or error), handle gracefully
+    // If there's no active session ID, show loading/welcome
     if (activeSessionId == null) {
-      log('No active session ID found. Displaying loading or empty state.');
+      log('ChatScreen: No active session ID found. Displaying loading indicator.');
       return Scaffold(
         appBar: AppBar(title: const Text('QCUIckBot')),
-        drawer: _buildDrawer(context, sessions, null), // Pass null for activeSessionId
-        body: const Center(child: CircularProgressIndicator()), // Or a welcome message
+        drawer: _buildDrawer(context, sessions, null), // Pass current sessions
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    // Watch the *specific* provider for the active session
-    final chatState = ref.watch(chatProvider(activeSessionId));
-    final messages = chatState.messages;
-    final isLoading = chatState.isLoading;
-
-    // Listen for changes in the active session's messages to scroll
+    // Listen for message changes in the active session to scroll (doesn't cause rebuild)
     ref.listen<ChatState>(chatProvider(activeSessionId), (previousState, newState) {
       if (previousState?.messages.length != newState.messages.length) {
         _scrollToBottom();
       }
     });
 
-    // Get the title for the AppBar from the history state
-    // Ensure orElse provides a default ChatSessionHeader with all required fields
+    // Get the title for the AppBar from the sessions list
     final activeSessionHeader = sessions.firstWhere(
       (s) => s.id == activeSessionId,
-      orElse: () => const ChatSessionHeader(id: '', title: 'Chat', isPinned: false, isArchived: false), // Provide defaults
+      orElse: () => const ChatSessionHeader(id: '', title: 'Chat', isPinned: false, isArchived: false),
     );
     final activeSessionTitle = activeSessionHeader.title;
 
-
+    // Build the main Scaffold structure (AppBar, Drawer) - this part won't rebuild on chat state changes
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Text(
-          activeSessionTitle, // Use dynamic title
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          overflow: TextOverflow.ellipsis, // Handle long titles
+          activeSessionTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
         ),
         elevation: 0,
         actions: [
-          const NotificationIconButton(),
+          NotificationIconButton(), // Assuming this is optimized or doesn't change often
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            icon: const Icon(Icons.add_circle_outline),
             tooltip: 'New Chat',
             onPressed: () {
               ref.read(chatHistoryProvider.notifier).startNewChat(activate: true);
-              // No need to pop drawer here as it's in the AppBar
             },
           ),
         ],
       ),
       drawer: _buildDrawer(context, sessions, activeSessionId), // Pass sessions and active ID
       body: Container(
-        color: AppColors.mainBackground,
-        child: Column(
-          children: [
-            // Removed 'Today' text for simplicity with history
-            // Padding(
-            //   padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
-            //   child: Text(
-            //     'Today',
-            //     style: TextStyle(
-            //       color: Colors.grey[600],
-            //       fontWeight: FontWeight.w500,
-            //     ),
-            //   ),
-            // ),
-            Expanded(
-              child: messages.isEmpty && !isLoading
-                  ? Center(
-                      child: Text(
-                      'Ask me anything!',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                    ))
-                  : ListView.builder(
-                      controller: _scrollController,
-                      reverse: false, // Keep false for natural chat flow
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0), // Add vertical padding
-                      itemCount: messages.length + (isLoading ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (isLoading && index == messages.length) {
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: AvatarBubble(
-                                message: ChatMessage(
-                                  text: '...',
-                                  isUser: false,
-                                  type: MessageType.text,
-                                ),
-                                isThinking: true,
-                              ),
-                            ),
-                          );
-                        }
-                        if (index >= messages.length) {
-                           // Should not happen with the check above, but safeguard
-                           return const SizedBox.shrink();
-                        }
-                        final message = messages[index];
+        color: Theme.of(context).scaffoldBackgroundColor,
+        // 2. Wrap the Column in a Consumer to scope the chatProvider watch
+        child: Consumer(
+          builder: (context, ref, child) {
+            // Watch the active chat session state *inside* the Consumer
+            log('ChatScreen Consumer: Watching chatProvider for session ID: $activeSessionId');
+            final chatState = ref.watch(chatProvider(activeSessionId));
+            final messages = chatState.messages;
+            final isLoading = chatState.isLoading;
+            log('ChatScreen Consumer: Received state for session $activeSessionId. isLoading: $isLoading, Message count: ${messages.length}');
 
-                        // Quick replies logic remains the same
-                        if (message.type == MessageType.quickReplies &&
-                            message.quickReplies != null) {
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              left: 50.0, top: 4.0, bottom: 4.0),
-                            child: Wrap(
-                              spacing: 8.0,
-                              runSpacing: 4.0,
-                              children: message.quickReplies!
-                                  .map((reply) => ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.botBubble,
-                                          foregroundColor: AppColors.bubbleText,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(18),
-                                            side: BorderSide(color: AppColors.sidebarCard),
-                                          ),
-                                          elevation: 1,
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        ),
-                                        onPressed: () {
-                                          // Send reply using the *active* session's notifier
-                                          ref.read(chatProvider(activeSessionId).notifier).sendMessage(reply);
-                                        },
-                                        child: Text(reply),
-                                      ))
-                                  .toList(),
-                            ),
-                          );
-                        } else {
-                          return AvatarBubble(message: message);
-                        }
-                      },
-                    ),
-            ),
-            ChatInputBar(
-              controller: _controller,
-              onSend: () {
-                final text = _controller.text;
-                if (text.isNotEmpty) {
-                  _controller.clear();
-                  // Send message using the *active* session's notifier
-                  ref.read(chatProvider(activeSessionId).notifier).sendMessage(text);
-                }
-              },
-              isLoading: isLoading,
-            ),
-          ],
+            // This Column and its children will rebuild when chatState changes
+            return Column(
+              children: [
+                Expanded(
+                  child: messages.isEmpty && !isLoading
+                      ? Center(
+                          child: Text(
+                          'Ask me anything!',
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                            fontSize: 16
+                          ),
+                        ))
+                      : ListView.builder(
+                          controller: _scrollController,
+                          reverse: false,
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+                          itemCount: messages.length + (isLoading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (isLoading && index == messages.length) {
+                              // Show thinking indicator
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: AvatarBubble(
+                                    message: ChatMessage(
+                                      text: '...',
+                                      isUser: false,
+                                      type: MessageType.text,
+                                    ),
+                                    isThinking: true,
+                                  ),
+                                ),
+                              );
+                            }
+                            if (index >= messages.length) {
+                               return const SizedBox.shrink(); // Safeguard
+                            }
+                            final message = messages[index];
+                            final theme = Theme.of(context);
+
+                            // Quick replies
+                            if (message.type == MessageType.quickReplies &&
+                                message.quickReplies != null) {
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 50.0, top: 4.0, bottom: 4.0),
+                                child: Wrap(
+                                  spacing: 8.0,
+                                  runSpacing: 4.0,
+                                  children: message.quickReplies!
+                                      .map((reply) => ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: theme.cardColor,
+                                              foregroundColor: theme.textTheme.bodyMedium?.color,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(18),
+                                                side: BorderSide(color: theme.dividerColor),
+                                              ),
+                                              elevation: 1,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            ),
+                                            onPressed: () {
+                                              // Use the activeSessionId from the outer scope
+                                              ref.read(chatProvider(activeSessionId).notifier).sendMessage(reply);
+                                            },
+                                            child: Text(reply),
+                                          ))
+                                      .toList(),
+                                ),
+                              );
+                            } else {
+                              // Regular message bubble
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                // Use index as key since message has no stable ID
+                                child: AvatarBubble(key: ValueKey(index), message: message),
+                              );
+                            }
+                          },
+                        ),
+                ),
+                // Chat Input Bar - rebuilds only when isLoading changes within the Consumer scope
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ChatInputBar(
+                    controller: _controller,
+                    isLoading: isLoading, // Pass isLoading from Consumer scope
+                    onSend: () {
+                      // Use activeSessionId from outer scope
+                      ref.read(chatProvider(activeSessionId).notifier).sendMessage(_controller.text);
+                      _controller.clear();
+                      _scrollToBottom();
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  // Helper method to build the drawer UI
+  // --- Helper Widgets ---
+
   Widget _buildDrawer(BuildContext context, List<ChatSessionHeader> sessions, String? activeSessionId) {
     // final historyNotifier = ref.read(chatHistoryProvider.notifier); // Moved to ChatHistoryList
 

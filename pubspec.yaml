@@ -32,16 +32,17 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^2.5.1
   cupertino_icons: ^1.0.8
-  http: 1.3.0
+  http: ^1.3.0
   flutter_gemini: ^3.0.0
   google_generative_ai: ^0.4.0
   flutter_markdown: ^0.6.18 # Added for markdown support
   uuid: ^4.4.0 # Add uuid package
-  supabase_flutter: ^2.5.0 # Add Supabase
+  supabase_flutter: ^2.5.3 # Add Supabase
   speech_to_text: ^7.0.0 # Add Speech to Text
   firebase_core: ^3.13.0
   firebase_messaging: ^15.2.5
   flutter_local_notifications: ^19.1.0
+  app_links: ^6.4.0 # Add app_links package
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,6 +64,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/pictures/chatbotprofile.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

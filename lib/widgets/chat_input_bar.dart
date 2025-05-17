@@ -33,6 +33,28 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   void initState() {
     super.initState();
     _initSpeech();
+    // Add listener to rebuild widget when text changes, updating button state
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    // Remove listener
+    widget.controller.removeListener(_onTextChanged);
+    // Stop speech if listening
+    if (_isListening) {
+      _speechToText.stop();
+    }
+    // Note: The controller itself is managed by the parent (ChatScreen)
+    // and disposed there, so we don't dispose it here.
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    // Call setState to rebuild the widget and update the send button state
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   /// This has to happen only once per app
@@ -121,26 +143,31 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context); // Get the current theme
+
     // Determine mic icon and color based on state
     IconData micIcon = Icons.mic_none;
-    Color micColor = Colors.grey[400]!; // Default color
+    // Use theme colors for the mic icon
+    Color micColor = theme.iconTheme.color?.withOpacity(0.6) ?? Colors.grey[400]!;
     VoidCallback? micOnPressed = _startListening; // Default action
 
     if (!_speechEnabled || widget.isLoading) {
       micIcon = Icons.mic_off;
-      micColor = Colors.grey[700]!; // Disabled color
+      micColor = theme.disabledColor; // Use theme's disabled color
       micOnPressed = null; // Disable button
     } else if (_isListening) {
       micIcon = Icons.mic; // Listening icon
-      micColor = Theme.of(context).primaryColor; // Active color
+      micColor = theme.primaryColor; // Active color (already theme-aware)
       micOnPressed = _stopListening; // Action to stop
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.mainBackground, // match dark mode
-        border: Border(top: BorderSide(color: AppColors.sidebarCard)),
+        // Use a theme-aware background color (e.g., cardColor or surface)
+        color: theme.colorScheme.surface, // Use surface color for better contrast
+        // Use a theme-aware border color
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: [
@@ -149,26 +176,31 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
             color: Colors.transparent,
             child: IconButton(
               icon: Icon(micIcon, color: micColor),
-              tooltip: _isListening ? 'Stop listening' : (_speechEnabled ? 'Tap to speak' : 'Speech not available'),
               onPressed: micOnPressed,
+              tooltip: _isListening ? 'Stop listening' : 'Start voice input',
             ),
           ),
+          // Text Input Field
           Expanded(
             child: TextField(
               controller: widget.controller,
               decoration: InputDecoration(
-                hintText: _isListening ? 'Listening...' : 'Type or tap mic...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                border: InputBorder.none,
-                filled: true,
-                fillColor: AppColors.userBubble, // dark bubble for input
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0), // Adjust padding
+                hintText: 'Type or tap mic...',
+                // Ensure hint style uses theme color
+                hintStyle: TextStyle(color: theme.hintColor),
+                // Use the theme's input decoration (already configured in main.dart)
+                // border: InputBorder.none, // Remove this if you want the theme's border
+                // fillColor: Colors.transparent, // Remove this to use theme's fillColor
+                filled: true, // Ensure theme's fillColor is used
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
-              minLines: 1,
-              maxLines: PlatformHelper.isMobile ? 4 : 1,
-              enabled: !widget.isLoading && !_isListening, // Disable text input while listening
-              onSubmitted: PlatformHelper.isMobile ? null : ((_) => widget.onSend()),
-              textInputAction: TextInputAction.send, // Add send action
+              // style: TextStyle(color: theme.textTheme.bodyLarge?.color), // Rely on default theme text style
+              enabled: !widget.isLoading,
+              keyboardType: TextInputType.multiline, // Allow multiline input
+              maxLines: null, // Allow text field to grow
+              textInputAction: TextInputAction.newline, // Change action to newline
+              // onSubmitted: (_) => widget.onSend(), // Remove sending on submit
             ),
           ),
           // Send Button
@@ -177,11 +209,14 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
             child: IconButton(
               icon: Icon(
                 Icons.send,
-                color: widget.isLoading
-                    ? AppColors.sidebarCard
-                    : const Color.fromARGB(255, 64, 140, 255),
+                // Use primary color for send button, potentially disabled
+                color: widget.controller.text.isNotEmpty && !widget.isLoading
+                    ? theme.primaryColor
+                    : theme.disabledColor,
               ),
-              onPressed: widget.isLoading ? null : widget.onSend,
+              onPressed: widget.controller.text.isNotEmpty && !widget.isLoading
+                  ? widget.onSend
+                  : null,
               tooltip: 'Send message',
             ),
           ),

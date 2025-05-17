@@ -107,35 +107,46 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
       final activeAndPinnedSessions = allSessions.where((s) => !s.isArchived).toList();
       final archivedSessions = allSessions.where((s) => s.isArchived).toList();
 
+      log('[ChatHistory] Found ${activeAndPinnedSessions.length} active/pinned and ${archivedSessions.length} archived sessions.'); // <-- ADDED LOG
+
       if (activeAndPinnedSessions.isNotEmpty) {
+        final newActiveId = activeAndPinnedSessions.first.id; // <-- Store ID
         state = state.copyWith(
           sessions: activeAndPinnedSessions,
           archivedSessions: archivedSessions,
-          activeSessionId: activeAndPinnedSessions.first.id, // Activate the first non-archived
+          activeSessionId: newActiveId, // <-- Use stored ID
           isLoading: false,
         );
-        log('[ChatHistory] Set active session to: ${activeAndPinnedSessions.first.id}');
+        log('[ChatHistory] Set active session to: $newActiveId'); // <-- Use stored ID
       } else {
+        log('[ChatHistory] No active/pinned sessions found.'); // <-- ADDED LOG
         // If only archived chats exist or no chats exist, start a new one
         if (mounted) {
           state = state.copyWith(
             isLoading: false,
             sessions: [], // Ensure main list is empty
             archivedSessions: archivedSessions, // Keep archived ones
+            activeSessionId: null, // Explicitly null before starting new
           );
+          log('[ChatHistory] State updated with empty sessions, activeSessionId is null.'); // <-- ADDED LOG
           // Only start a new chat if there are no archived ones either
           if (archivedSessions.isEmpty) {
+             log('[ChatHistory] No archived sessions either, starting new chat.'); // <-- ADDED LOG
              await startNewChat(activate: true);
+          } else {
+             log('[ChatHistory] Archived sessions exist, not starting new chat automatically.'); // <-- ADDED LOG
           }
         }
       }
     } catch (e, stackTrace) {
-      log('[ChatHistory] Error loading chats: $e');
-      log('[ChatHistory] Stack trace: $stackTrace');
+      log('[ChatHistory] Error loading chats: $e'); // <-- Keep this
+      log('[ChatHistory] Stack trace: $stackTrace'); // <-- Keep this
       if (mounted) {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isLoading: false, activeSessionId: null); // Ensure active ID is null on error before potentially starting new
+        log('[ChatHistory] Error occurred, state updated. isLoading: false, activeSessionId: null.'); // <-- ADDED LOG
         // Start new chat only if there are absolutely no sessions loaded (active or archived)
         if (state.sessions.isEmpty && state.archivedSessions.isEmpty) {
+          log('[ChatHistory] Starting new chat after error as no sessions exist.'); // <-- ADDED LOG
           await startNewChat(activate: true);
         }
       }
@@ -166,11 +177,12 @@ class ChatHistoryNotifier extends StateNotifier<ChatHistoryState> {
     if (mounted) {
       // Add to the beginning of the main sessions list
       final updatedSessions = [newSessionHeader, ...state.sessions];
+      final newActiveId = activate ? newSessionId : state.activeSessionId; // <-- Store ID
       state = state.copyWith(
         sessions: updatedSessions,
-        activeSessionId: activate ? newSessionId : state.activeSessionId,
+        activeSessionId: newActiveId, // <-- Use stored ID
       );
-      log('[ChatHistory] Optimistically updated local state with new chat: $newSessionId');
+      log('[ChatHistory] Optimistically updated local state with new chat: $newSessionId. Active ID set to: $newActiveId'); // <-- UPDATED LOG
     } else {
       log('[ChatHistory] Not mounted, cannot start new chat.');
       return '';
