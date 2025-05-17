@@ -60,7 +60,12 @@ class AuthService {
   // Sign up with email and password
   Future<AuthResponse> signUp(String email, String password) async {
     try {
-      final response = await _auth.signUp(email: email, password: password);
+      final response = await _auth.signUp(
+        email: email,
+        password: password,
+        // Redirect user back to login page after email confirmation
+        emailRedirectTo: 'https://qcuickbot3rdyear.netlify.app',
+      );
       log('[AuthService] User signed up: ${response.user?.id}');
       return response;
     } on AuthException catch (e) {
