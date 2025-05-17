@@ -1,12 +1,7 @@
 [build]
-  command = "flutter build web"
-  publish = "build/web"
+  command = "./build_script.sh"
+  publish = "build/web" # This should be the directory where flutter build web outputs files
 
-[[plugins]]
-package = "netlify-plugin-command-runner"
-  [plugins.inputs]
-    commands = [
-      "git clone https://github.com/flutter/flutter.git --depth 1 -b stable $HOME/flutter",
-      "export PATH=\"$PATH:$HOME/flutter/bin\"",
-      "flutter doctor" # Optional: to verify installation
-    ]
+# If you have environment variables, define them here
+[build.environment]
+  SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpndmFxd214d3RoZXJ4cmRwbG12Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTQ2MzU4MCwiZXhwIjoyMDYxMDM5NTgwfQ.xHo0XWWggukuxzg7PEYjHuDZCpShFXBsGPJWFAGTKjM" # Replace with your actual environment variable name
