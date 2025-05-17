@@ -11,7 +11,6 @@ class NotificationService {
   /// Streams notifications for the current user, optionally filtered by courseId.
   Stream<List<NotificationItem>> subscribeNotifications({String? courseId}) {
     final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return const Stream.empty();
 
     // Create a StreamController to manage the notification stream
     final controller = StreamController<List<NotificationItem>>();
@@ -77,18 +76,23 @@ class NotificationService {
   }
 
   /// Helper method to fetch notifications
-  Future<List<NotificationItem>> _fetchNotifications(String userId, String? courseId) async {
-    var query = _supabase
-        .from('notifications')
-        .select()
-        .eq('user_id', userId);
-    
+  Future<List<NotificationItem>> _fetchNotifications(String? userId, String? courseId) async {
+    var query = _supabase.from('notifications').select();
+
+    if (userId == null) {
+      // only global (user_id IS NULL)
+      query = query.filter('user_id', 'is', null);
+    } else {
+      // own notifications OR global
+      query = query.or('user_id.eq.$userId,user_id.is.null');
+    }
+
     if (courseId != null) {
       query = query.eq('course_id', courseId);
     }
 
     final data = await query.order('created_at', ascending: false);
-    return data.map((map) => NotificationItem.fromMap(map)).toList();
+    return data.map((m) => NotificationItem.fromMap(m)).toList();
   }
 
   /// Marks a specific notification as read in the database.
