@@ -84,12 +84,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     // Set loading state immediately before the async call
     if (mounted) {
-        // Avoid setting isLoading if messages already exist? Maybe not necessary.
-        // Let's keep it simple for now.
-        // state = state.copyWith(isLoading: true); // Let's NOT set loading here, rely on history provider? No, chat screen uses this. Set it.
-        // Correction: The ChatScreen *does* use this isLoading. We need it.
-        // But maybe only set it if messages are empty?
-        // Let's set it unconditionally for now to see the flow.
         state = state.copyWith(isLoading: true);
         log('[ChatNotifier $sessionId] Set isLoading = true');
     }
