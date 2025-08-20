@@ -35,10 +35,38 @@ cd qcuickbot3rdyear
 ```
 
 ### 2. Environment Configuration
-Create a `.env` file in the root directory:
-```env
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+Create a `.env` file in the root directory by copying from `env.example`:
+```bash
+cp env.example .env
 ```
+
+**Or use the automated setup script:**
+```bash
+python setup_env.py
+```
+
+Then fill in your actual API keys and configuration values:
+```env
+# Firebase Configuration
+FIREBASE_WEB_API_KEY=your_actual_web_api_key
+FIREBASE_ANDROID_API_KEY=your_actual_android_api_key
+FIREBASE_IOS_API_KEY=your_actual_ios_api_key
+FIREBASE_MACOS_API_KEY=your_actual_macos_api_key
+FIREBASE_WINDOWS_API_KEY=your_actual_windows_api_key
+FIREBASE_MESSAGING_SENDER_ID=your_actual_messaging_sender_id
+FIREBASE_PROJECT_ID=your_actual_project_id
+FIREBASE_STORAGE_BUCKET=your_actual_storage_bucket
+
+# Gemini AI Configuration
+GEMINI_API_KEY=your_actual_gemini_api_key
+
+# Supabase Configuration
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
+
+**⚠️ IMPORTANT: Never commit your `.env` file to version control!**
 
 ### 3. Install Dependencies
 ```bash
@@ -48,9 +76,8 @@ flutter pub get
 ### 4. Firebase Setup
 - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
 - Add your Flutter app to the project
-- Download and place configuration files:
-  - `google-services.json` in `android/app/`
-  - `GoogleService-Info.plist` in `ios/Runner/`
+- **IMPORTANT**: The configuration files now use environment variables instead of hardcoded API keys
+- Update your `.env` file with the Firebase configuration values from your project
 - Enable Firebase Cloud Messaging
 
 ### 5. Supabase Setup
@@ -60,7 +87,7 @@ flutter pub get
 
 ### 6. Google AI Setup
 - Get your Google Gemini API key from [Google AI Studio](https://makersuite.google.com/)
-- Configure the API key in your app
+- Add the API key to your `.env` file as `GEMINI_API_KEY`
 
 ## 🚀 Running the App
 

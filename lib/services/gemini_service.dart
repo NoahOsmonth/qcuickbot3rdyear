@@ -6,8 +6,9 @@ import '../models/chat_message.dart'; // Assuming this path is correct
 
 class GeminiService {
   // --- Configuration ---
-  // WARNING: Hardcoding API keys is insecure. Use environment variables or a secure secrets management solution.
-  static const String _geminiApiKey = 'AIzaSyAABYqmrnMXeJi2SLwqSAx_HTx2DBm4pYA'; // Replace with your actual key securely
+  // IMPORTANT: API keys should be loaded from environment variables or secure configuration.
+  // Do not hardcode API keys in this file.
+  static const String _geminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   // URL for your RAG FastAPI server
   static const String _ragApiUrl = 'https://rag-retrieval-production.up.railway.app/query'; // Adjust if your server is elsewhere

@@ -12,8 +12,10 @@ import 'package:flutter/foundation.dart'
 /// // ...
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
 /// ```
+///
+/// IMPORTANT: API keys should be loaded from environment variables or secure configuration.
+/// Do not hardcode API keys in this file.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -40,49 +42,49 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC5kDV-TuhIzbVaLPYi01o923RfScRUAzw',
-    appId: '1:45209853406:web:ad0a6b91694718d144d14f',
-    messagingSenderId: '45209853406',
-    projectId: 'our-project-quickbot-e3c2f',
-    authDomain: 'our-project-quickbot-e3c2f.firebaseapp.com',
-    storageBucket: 'our-project-quickbot-e3c2f.firebasestorage.app',
-    measurementId: 'G-ZZKNMGZFT1',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_WEB_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    authDomain: const String.fromEnvironment('FIREBASE_AUTH_DOMAIN'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
+    measurementId: const String.fromEnvironment('FIREBASE_MEASUREMENT_ID'),
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCKAjoJsWfUhXgBHgUBZT33fzUeCX6xbg4',
-    appId: '1:45209853406:android:4e935539b535409744d14f',
-    messagingSenderId: '45209853406',
-    projectId: 'our-project-quickbot-e3c2f',
-    storageBucket: 'our-project-quickbot-e3c2f.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDqbOcvREQ-3nrmugarIHd-rYAZA6lRf6c',
-    appId: '1:45209853406:ios:00f8c5eda58f652144d14f',
-    messagingSenderId: '45209853406',
-    projectId: 'our-project-quickbot-e3c2f',
-    storageBucket: 'our-project-quickbot-e3c2f.firebasestorage.app',
-    iosBundleId: 'com.example.qcuickbot',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
+    iosBundleId: const String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDqbOcvREQ-3nrmugarIHd-rYAZA6lRf6c',
-    appId: '1:45209853406:ios:00f8c5eda58f652144d14f',
-    messagingSenderId: '45209853406',
-    projectId: 'our-project-quickbot-e3c2f',
-    storageBucket: 'our-project-quickbot-e3c2f.firebasestorage.app',
-    iosBundleId: 'com.example.qcuickbot',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_MACOS_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_MACOS_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
+    iosBundleId: const String.fromEnvironment('FIREBASE_MACOS_BUNDLE_ID'),
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyC5kDV-TuhIzbVaLPYi01o923RfScRUAzw',
-    appId: '1:45209853406:web:7f07806fc5da702144d14f',
-    messagingSenderId: '45209853406',
-    projectId: 'our-project-quickbot-e3c2f',
-    authDomain: 'our-project-quickbot-e3c2f.firebaseapp.com',
-    storageBucket: 'our-project-quickbot-e3c2f.firebasestorage.app',
-    measurementId: 'G-5MTEY1EQY5',
+  static FirebaseOptions get windows => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_WINDOWS_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_WINDOWS_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    authDomain: const String.fromEnvironment('FIREBASE_AUTH_DOMAIN'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
+    measurementId: const String.fromEnvironment('FIREBASE_WINDOWS_MEASUREMENT_ID'),
   );
 }
